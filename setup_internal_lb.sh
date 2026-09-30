@@ -34,8 +34,8 @@ if [ -z "${REGION:-}" ]; then
     REGION="asia-southeast1"
 fi
 
-ZONE="${ZONE:-${REGION}-b}"
-ZONE_UTILITY="${ZONE_UTILITY:-$ZONE}"
+# Utility VM Zone (in asia-southeast1, lab assigns asia-southeast1-c)
+ZONE_UTILITY="${ZONE:-asia-southeast1-c}"
 
 gcloud config set compute/region "$REGION" --quiet 2>/dev/null || true
 
@@ -132,7 +132,7 @@ done
 
 ZONE_IG1=$(gcloud compute instances list --filter="name='$VM1'" --format="value(zone)" 2>/dev/null | head -n1 || echo "")
 ZONE_IG2=$(gcloud compute instances list --filter="name='$VM2'" --format="value(zone)" 2>/dev/null | head -n1 || echo "")
-if [ -z "$ZONE_IG1" ]; then ZONE_IG1="${REGION}-c"; fi
+if [ -z "$ZONE_IG1" ]; then ZONE_IG1="${REGION}-b"; fi
 if [ -z "$ZONE_IG2" ]; then ZONE_IG2="${REGION}-a"; fi
 
 echo -e "${GREEN}[INFO] Found VM1: ${VM1} in ${ZONE_IG1}${NC}"
@@ -157,9 +157,9 @@ for attempt in {1..5}; do
     sleep 5
 done
 
-# Create utility-vm
+# Create utility-vm in ZONE_UTILITY
 if gcloud compute instances describe utility-vm --zone="$ZONE_UTILITY" &>/dev/null; then
-    echo -e "${BLUE}[SKIP] VM 'utility-vm' already exists.${NC}"
+    echo -e "${BLUE}[SKIP] VM 'utility-vm' already exists in ${ZONE_UTILITY}.${NC}"
 else
     echo -e "${BLUE}[INFO] Creating 'utility-vm' in zone ${ZONE_UTILITY}...${NC}"
     gcloud compute instances create utility-vm \
@@ -249,7 +249,7 @@ if ! gcloud compute backend-services describe my-ilb-backend-service --region="$
         --health-checks=my-ilb-health-check 2>/dev/null || true
 fi
 
-# Add Backends (instance-group-1 and instance-group-2)
+# Add Backends (instance-group-1 in asia-southeast1-b and instance-group-2 in asia-southeast1-a)
 echo -e "${BLUE}[INFO] Attaching instance groups to backend service...${NC}"
 gcloud compute backend-services add-backend my-ilb \
     --instance-group=instance-group-1 \
