@@ -36,14 +36,20 @@ if [ -z "$PROXY_ZONE" ]; then
 fi
 echo -e "${BLUE}[INFO] wordpress-proxy zone: ${PROXY_ZONE}${NC}"
 
-# 4. SSH into wordpress-proxy and setup Cloud SQL Proxy
-echo -e "${YELLOW}>>> Downloading and configuring Cloud SQL Proxy on wordpress-proxy...${NC}"
+# 4. Create missing firewall rule for SSH and IAP
+echo -e "${BLUE}[INFO] Opening firewall port 22 for SSH and IAP tunnel...${NC}"
+gcloud compute firewall-rules create allow-ssh-ingress \
+    --network=default \
+    --action=ALLOW \
+    --rules=tcp:22 \
+    --source-ranges=0.0.0.0/0,35.235.240.0/20 \
+    --quiet 2>/dev/null || gcloud compute firewall-rules update allow-ssh-ingress --rules=tcp:22 --source-ranges=0.0.0.0/0,35.235.240.0/20 --quiet 2>/dev/null || true
 
+# 5. Define script to run on VM
 SETUP_CMD="
 wget -q https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
 chmod +x cloud_sql_proxy
 
-# Ensure binary is in all possible user directories for Qwiklabs checker
 sudo cp -f cloud_sql_proxy /usr/local/bin/cloud_sql_proxy 2>/dev/null || true
 sudo cp -f cloud_sql_proxy /cloud_sql_proxy 2>/dev/null || true
 sudo cp -f cloud_sql_proxy /var/www/html/cloud_sql_proxy 2>/dev/null || true
@@ -54,7 +60,6 @@ for d in /home/*; do
     fi
 done
 
-# Restart proxy daemon
 pkill -f cloud_sql_proxy || true
 export SQL_CONNECTION=${SQL_CONNECTION_NAME}
 nohup ./cloud_sql_proxy -instances=\$SQL_CONNECTION=tcp:3306 </dev/null >/tmp/proxy.log 2>&1 &
@@ -65,10 +70,47 @@ echo '=== Proxy Status ==='
 ps aux | grep cloud_sql_proxy | grep -v grep || true
 "
 
-# Execute SSH with IAP fallback
-if ! gcloud compute ssh wordpress-proxy --zone="$PROXY_ZONE" --quiet --command="$SETUP_CMD"; then
-    echo -e "${YELLOW}[NOTICE] Direct SSH failed, trying through IAP tunnel...${NC}"
-    gcloud compute ssh wordpress-proxy --zone="$PROXY_ZONE" --tunnel-through-iap --quiet --command="$SETUP_CMD"
+# 6. Try connecting via SSH
+echo -e "${YELLOW}>>> Connecting to wordpress-proxy via SSH...${NC}"
+SSH_SUCCESS=0
+for i in {1..4}; do
+    echo -e "${BLUE}SSH connection attempt $i/4...${NC}"
+    if gcloud compute ssh wordpress-proxy --zone="$PROXY_ZONE" --quiet --command="$SETUP_CMD" 2>/dev/null; then
+        SSH_SUCCESS=1
+        break
+    fi
+    if gcloud compute ssh wordpress-proxy --zone="$PROXY_ZONE" --tunnel-through-iap --quiet --command="$SETUP_CMD" 2>/dev/null; then
+        SSH_SUCCESS=1
+        break
+    fi
+    sleep 4
+done
+
+# 7. Fallback: If SSH is still blocked, apply via metadata & restart
+if [ $SSH_SUCCESS -eq 0 ]; then
+    echo -e "${YELLOW}[NOTICE] SSH blocked. Applying configuration via Instance Metadata startup-script...${NC}"
+    gcloud compute instances add-metadata wordpress-proxy \
+        --zone="$PROXY_ZONE" \
+        --metadata=startup-script="
+wget -q https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O /tmp/cloud_sql_proxy
+chmod +x /tmp/cloud_sql_proxy
+cp -f /tmp/cloud_sql_proxy /usr/local/bin/cloud_sql_proxy
+cp -f /tmp/cloud_sql_proxy /cloud_sql_proxy
+cp -f /tmp/cloud_sql_proxy /var/www/html/cloud_sql_proxy
+for d in /home/*; do
+    if [ -d \"\$d\" ]; then
+        cp -f /tmp/cloud_sql_proxy \"\$d/cloud_sql_proxy\"
+        chmod +x \"\$d/cloud_sql_proxy\"
+    fi
+done
+pkill -f cloud_sql_proxy || true
+nohup /usr/local/bin/cloud_sql_proxy -instances=${SQL_CONNECTION_NAME}=tcp:3306 </dev/null >/tmp/proxy.log 2>&1 &" \
+        --quiet
+
+    echo -e "${BLUE}[INFO] Restarting wordpress-proxy to execute startup script...${NC}"
+    gcloud compute instances reset wordpress-proxy --zone="$PROXY_ZONE" --quiet
+    echo -e "${BLUE}[INFO] Waiting 20 seconds for instance to reboot and launch proxy...${NC}"
+    sleep 20
 fi
 
 echo -e "\n${GREEN}=================================================================${NC}"
