@@ -35,18 +35,20 @@ echo -e "${GREEN}[INFO] VM 1 Zone: ${ZONE_1}${NC}"
 echo -e "${GREEN}[INFO] VM 2 Zone: ${ZONE_2}${NC}"
 
 # ==============================================================================
-# Task 1: Ensure Terraform is Installed & Setup Workspace
+# Task 1: Ensure Real Terraform Binary is Installed & Setup Workspace
 # ==============================================================================
 echo -e "\n${YELLOW}>>> [Task 1/3] Setting up Terraform & Workspace...${NC}"
 
-if ! command -v terraform &>/dev/null; then
-    echo -e "${BLUE}[INFO] Installing Terraform CLI...${NC}"
+# Cloud Shell contains a placeholder wrapper by default; verify real Terraform is present
+if ! terraform version 2>&1 | grep -q 'Terraform v'; then
+    echo -e "${BLUE}[INFO] Installing Terraform CLI from HashiCorp repository...${NC}"
     wget -O - https://apt.releases.hashicorp.com/gpg 2>/dev/null | sudo gpg --dearmor --yes -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list > /dev/null
     sudo apt update -qq && sudo apt install -y -qq terraform
+    hash -r
 fi
 
-echo -e "${GREEN}[INFO] Terraform Version: $(terraform --version | head -n1)${NC}"
+echo -e "${GREEN}[INFO] $(terraform version | head -n1)${NC}"
 
 # Create tfinfra directory structure in user home
 WORKSPACE_DIR="$HOME/tfinfra"
