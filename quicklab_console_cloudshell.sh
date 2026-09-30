@@ -105,8 +105,14 @@ else
         --zone="$ZONE" \
         --machine-type=e2-micro \
         --tags=http-server \
-        --image-family=debian-11 \
+        --image-family=debian-12 \
         --image-project=debian-cloud \
+        --metadata=startup-script="$STARTUP_SCRIPT" \
+        --quiet || \
+    gcloud compute instances create first-vm \
+        --zone="$ZONE" \
+        --machine-type=e2-micro \
+        --tags=http-server \
         --metadata=startup-script="$STARTUP_SCRIPT" \
         --quiet
 fi
@@ -191,7 +197,7 @@ gcloud storage buckets add-iam-policy-binding "$BUCKET1" \
     --member=allUsers \
     --role=roles/storage.objectViewer \
     --quiet 2>/dev/null || \
-gsutil iam ch allUsers:objectViewer "$BUCKET1" 2>/dev/null || true
+    gsutil iam ch allUsers:objectViewer "$BUCKET1" 2>/dev/null || true
 
 echo -e "${GREEN}[SUCCESS] Cat image public URL: ${CAT_IMAGE_URL}${NC}"
 echo -e "${GREEN}[SUCCESS] Checkpoint 2 Complete: Cloud Storage Buckets and permissions created!${NC}"
@@ -241,13 +247,14 @@ for i in {1..30}; do
 done
 
 # Ensure SSH key exists in Cloud Shell
-if [ ! -f "$HOME/.ssh/id_rsa" ]; then
-    ssh-keygen -t rsa -N "" -f "$HOME/.ssh/id_rsa" -q || true
+if [ ! -f "$HOME/.ssh/google_compute_engine" ]; then
+    mkdir -p "$HOME/.ssh"
+    ssh-keygen -t rsa -N "" -f "$HOME/.ssh/google_compute_engine" -C "student" -q || true
 fi
 
 # 4.6 Copy index.html to first-vm via scp and configure Nginx
 echo -e "${BLUE}[INFO] Copying index.html to first-vm and verifying Nginx...${NC}"
-MAX_SCP_RETRIES=10
+MAX_SCP_RETRIES=15
 SCP_SUCCESS=0
 for i in $(seq 1 $MAX_SCP_RETRIES); do
     if gcloud compute scp --zone="$ZONE" --quiet index.html first-vm:index.html 2>/dev/null; then
