@@ -11,6 +11,7 @@ Collection of automated scripts and configurations for Google Cloud training lab
 3. [Configure an Internal Network Load Balancer (GSP041)](#3-configure-an-internal-network-load-balancer-gsp041)
 4. [Automating the Deployment of Infrastructure Using Terraform (CBL036)](#4-automating-the-deployment-of-infrastructure-using-terraform-cbl036)
 5. [Accessing the Google Cloud Console and Cloud Shell (CBL138)](#5-accessing-the-google-cloud-console-and-cloud-shell-cbl138)
+6. [Working with Cloud Build (CBL139)](#6-working-with-cloud-build-cbl139)
 
 ---
 
@@ -104,11 +105,30 @@ chmod +x quicklab_console_cloudshell.sh
 
 ---
 
+## 6. Working with Cloud Build (CBL139)
+
+Builds container images using a Dockerfile, pushes them to Artifact Registry, creates custom YAML-formatted Cloud Build configurations (`cloudbuild.yaml`), and implements automated container testing and failure handling (`cloudbuild2.yaml`).
+
+### ⚡ Quick Start (Cloud Shell)
+
+```bash
+curl -sL "https://raw.githubusercontent.com/Meet8376/test1/main/quicklab_cloud_build.sh?cache=$(date +%s)" -o quicklab_cloud_build.sh
+
+chmod +x quicklab_cloud_build.sh
+
+./quicklab_cloud_build.sh
+```
+
+---
+
 ## 📁 Repository Structure
 
 ```
+├── quicklab_cloud_build.sh        # Automation for Cloud Build lab (CBL139)
 ├── quicklab_console_cloudshell.sh # Automation for Console & Cloud Shell lab (CBL138)
+├── fix_first_vm.sh                # Task 1 & 3 quick fix for CBL138
 ├── quicklab_cloud_sql.sh          # Automation for Cloud SQL lab (CBL037)
+├── fix_task2_proxy.sh             # Task 2 quick fix for CBL037
 ├── quicklab_alb_autoscaling.sh    # Automation for ALB with Autoscaling (OCBL105)
 ├── fix_task6_stress_test.sh       # Task 6 quick fix for OCBL105
 ├── quicklab.sh                    # Automation for Internal NLB lab (GSP041)
