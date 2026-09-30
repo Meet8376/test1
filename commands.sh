@@ -5,10 +5,10 @@
 # ==============================================================================
 
 # Define Environment Variables
-export REGION="asia-east1"
-export ZONE_UTILITY="asia-east1-b"
-export ZONE_IG1="asia-east1-c"
-export ZONE_IG2="asia-east1-a"
+export REGION="asia-southeast1"
+export ZONE_UTILITY="asia-southeast1-b"
+export ZONE_IG1="asia-southeast1-c"
+export ZONE_IG2="asia-southeast1-a"
 export NETWORK="my-internal-app"
 export SUBNET_A="subnet-a"
 export SUBNET_B="subnet-b"
@@ -53,6 +53,9 @@ gcloud compute routers nats create nat-config \
 # Re-run startup scripts on both backend instances
 VM1=$(gcloud compute instances list --filter="name ~ 'instance-group-1'" --format="value(name)" | head -n1)
 VM2=$(gcloud compute instances list --filter="name ~ 'instance-group-2'" --format="value(name)" | head -n1)
+
+ZONE_IG1=$(gcloud compute instances list --filter="name='$VM1'" --format="value(zone)" 2>/dev/null | head -n1)
+ZONE_IG2=$(gcloud compute instances list --filter="name='$VM2'" --format="value(zone)" 2>/dev/null | head -n1)
 
 gcloud compute ssh "$VM1" --zone="$ZONE_IG1" --tunnel-through-iap --quiet --command="sudo google_metadata_script_runner startup"
 gcloud compute ssh "$VM2" --zone="$ZONE_IG2" --tunnel-through-iap --quiet --command="sudo google_metadata_script_runner startup"

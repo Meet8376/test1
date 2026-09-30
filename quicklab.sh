@@ -26,9 +26,15 @@ if [ -z "$PROJECT_ID" ]; then
 fi
 echo -e "${GREEN}[INFO] Active Project: ${PROJECT_ID}${NC}"
 
-# Detect or Set Region and Zones
-REGION="${REGION:-asia-east1}"
-ZONE="${ZONE:-asia-east1-b}"
+# Auto-detect or Set Region from my-internal-app subnets
+if [ -z "${REGION:-}" ]; then
+    REGION=$(gcloud compute networks subnets list --network="my-internal-app" --format="value(region.basename())" 2>/dev/null | head -n1 || echo "")
+fi
+if [ -z "${REGION:-}" ]; then
+    REGION="asia-southeast1"
+fi
+
+ZONE="${ZONE:-${REGION}-b}"
 ZONE_UTILITY="${ZONE_UTILITY:-$ZONE}"
 
 gcloud config set compute/region "$REGION" --quiet 2>/dev/null || true
@@ -126,8 +132,8 @@ done
 
 ZONE_IG1=$(gcloud compute instances list --filter="name='$VM1'" --format="value(zone)" 2>/dev/null | head -n1 || echo "")
 ZONE_IG2=$(gcloud compute instances list --filter="name='$VM2'" --format="value(zone)" 2>/dev/null | head -n1 || echo "")
-if [ -z "$ZONE_IG1" ]; then ZONE_IG1="asia-east1-c"; fi
-if [ -z "$ZONE_IG2" ]; then ZONE_IG2="asia-east1-a"; fi
+if [ -z "$ZONE_IG1" ]; then ZONE_IG1="${REGION}-c"; fi
+if [ -z "$ZONE_IG2" ]; then ZONE_IG2="${REGION}-a"; fi
 
 echo -e "${GREEN}[INFO] Found VM1: ${VM1} in ${ZONE_IG1}${NC}"
 echo -e "${GREEN}[INFO] Found VM2: ${VM2} in ${ZONE_IG2}${NC}"

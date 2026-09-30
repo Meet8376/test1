@@ -16,7 +16,13 @@ echo -e "${CYAN}======================================================${NC}"
 echo -e "${CYAN}   Fixing Task 4: Internal NLB Backend Service        ${NC}"
 echo -e "${CYAN}======================================================${NC}"
 
-export REGION="${REGION:-asia-east1}"
+# Auto-detect or Set Region from my-internal-app subnets
+if [ -z "${REGION:-}" ]; then
+    REGION=$(gcloud compute networks subnets list --network="my-internal-app" --format="value(region.basename())" 2>/dev/null | head -n1 || echo "")
+fi
+if [ -z "${REGION:-}" ]; then
+    REGION="asia-southeast1"
+fi
 
 echo -e "${BLUE}[INFO] Using Region: ${REGION}${NC}"
 
@@ -57,8 +63,8 @@ fi
 echo -e "${YELLOW}>>> [3/4] Attaching instance groups to backend service...${NC}"
 ZONE_IG1=$(gcloud compute instance-groups managed list --filter="name ~ 'instance-group-1'" --format="value(zone)" 2>/dev/null | head -n1)
 ZONE_IG2=$(gcloud compute instance-groups managed list --filter="name ~ 'instance-group-2'" --format="value(zone)" 2>/dev/null | head -n1)
-if [ -z "$ZONE_IG1" ]; then ZONE_IG1="asia-east1-c"; fi
-if [ -z "$ZONE_IG2" ]; then ZONE_IG2="asia-east1-a"; fi
+if [ -z "$ZONE_IG1" ]; then ZONE_IG1="${REGION}-c"; fi
+if [ -z "$ZONE_IG2" ]; then ZONE_IG2="${REGION}-a"; fi
 
 gcloud compute backend-services add-backend my-ilb \
     --instance-group=instance-group-1 \
