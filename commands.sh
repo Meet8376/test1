@@ -80,40 +80,56 @@ gcloud compute addresses create my-ilb-ip \
     --subnet=$SUBNET_B \
     --addresses=10.10.30.5
 
-# Create TCP health check
+# Create TCP health check (regional & global)
+gcloud compute health-checks create tcp my-ilb-health-check \
+    --region=$REGION \
+    --port=80 \
+    --check-interval=10s \
+    --timeout=5s \
+    --unhealthy-threshold=3 \
+    --healthy-threshold=2 2>/dev/null || true
+
 gcloud compute health-checks create tcp my-ilb-health-check \
     --port=80 \
     --check-interval=10s \
     --timeout=5s \
     --unhealthy-threshold=3 \
-    --healthy-threshold=2
+    --healthy-threshold=2 2>/dev/null || true
 
-# Create regional backend service
-gcloud compute backend-services create my-ilb-backend-service \
+# Create regional backend service (named 'my-ilb' to match lab requirement)
+gcloud compute backend-services create my-ilb \
+    --load-balancing-scheme=internal \
+    --protocol=TCP \
+    --region=$REGION \
+    --health-checks=my-ilb-health-check \
+    --health-checks-region=$REGION 2>/dev/null || \
+gcloud compute backend-services create my-ilb \
     --load-balancing-scheme=internal \
     --protocol=TCP \
     --region=$REGION \
     --health-checks=my-ilb-health-check
 
 # Add instance groups to backend service
-gcloud compute backend-services add-backend my-ilb-backend-service \
+gcloud compute backend-services add-backend my-ilb \
     --instance-group=instance-group-1 \
     --instance-group-zone=$ZONE_IG1 \
-    --region=$REGION
+    --region=$REGION 2>/dev/null || true
 
-gcloud compute backend-services add-backend my-ilb-backend-service \
+gcloud compute backend-services add-backend my-ilb \
     --instance-group=instance-group-2 \
     --instance-group-zone=$ZONE_IG2 \
-    --region=$REGION
+    --region=$REGION 2>/dev/null || true
 
 # Create forwarding rule
+gcloud compute forwarding-rules delete my-ilb --region=$REGION --quiet 2>/dev/null || true
+
 gcloud compute forwarding-rules create my-ilb \
     --load-balancing-scheme=internal \
     --ports=80 \
     --network=$NETWORK \
     --subnet=$SUBNET_B \
     --region=$REGION \
-    --backend-service=my-ilb-backend-service \
+    --backend-service=my-ilb \
     --backend-service-region=$REGION \
     --address=my-ilb-ip
 

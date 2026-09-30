@@ -53,20 +53,33 @@ Internal Network Load Balancing enables you to scale TCP/UDP services behind a p
 
 ---
 
-## ⚡ Quick Start (One Command Run in Cloud Shell)
+## ⚡ Quick Start (Full Lab Automation)
 
-1. Open the [Google Cloud Console](https://console.cloud.google.com/) using your temporary Qwiklabs lab credentials in Incognito mode.
-2. Activate **Cloud Shell** (the `>_` terminal icon in the top right corner).
-3. Clone this repository and run the setup script:
+Run this directly inside **Google Cloud Shell**:
 
 ```bash
-git clone https://github.com/Meet8376/test1.git
-cd test1
-chmod +x setup_internal_lb.sh verify.sh
-./setup_internal_lb.sh
+export REGION=asia-east1
+export ZONE=asia-east1-b
+
+curl -LO raw.githubusercontent.com/Meet8376/test1/main/quicklab.sh
+sudo chmod +x quicklab.sh
+./quicklab.sh
 ```
 
-The script will automatically detect the project ID, configure the firewall rules, set up Cloud Router & NAT, re-run startup scripts on backend instances, provision `utility-vm`, configure the Internal Load Balancer, and test traffic distribution.
+---
+
+## 🛠️ Quick Fix for Task 4 ("Please create the backend service with required configuration")
+
+If you configured the load balancer manually or via console and the Task 4 check reports:
+> *"Please create the backend service with required configuration."*
+
+Run this quick fix script in Cloud Shell:
+
+```bash
+curl -LO raw.githubusercontent.com/Meet8376/test1/main/fix_backend_service.sh
+sudo chmod +x fix_backend_service.sh
+./fix_backend_service.sh
+```
 
 ---
 
@@ -189,30 +202,48 @@ gcloud compute addresses create my-ilb-ip \
     --addresses=10.10.30.5
 ```
 
-#### 4.2 Create TCP Health Check (`my-ilb-health-check`)
+#### 4.2 Create Health Checks (Regional & Global)
 ```bash
+gcloud compute health-checks create tcp my-ilb-health-check \
+    --region=$REGION \
+    --port=80 \
+    --check-interval=10s \
+    --timeout=5s \
+    --unhealthy-threshold=3 \
+    --healthy-threshold=2 2>/dev/null || true
+
 gcloud compute health-checks create tcp my-ilb-health-check \
     --port=80 \
     --check-interval=10s \
     --timeout=5s \
     --unhealthy-threshold=3 \
-    --healthy-threshold=2
+    --healthy-threshold=2 2>/dev/null || true
 ```
 
-#### 4.3 Create Regional Backend Service and Add Instance Groups
+#### 4.3 Create Regional Backend Service (`my-ilb`) and Add Instance Groups
+> **Note:** The backend service must be named **`my-ilb`** to match the lab validator requirement.
 ```bash
-gcloud compute backend-services create my-ilb-backend-service \
+# Create backend service
+gcloud compute backend-services create my-ilb \
+    --load-balancing-scheme=internal \
+    --protocol=TCP \
+    --region=$REGION \
+    --health-checks=my-ilb-health-check \
+    --health-checks-region=$REGION 2>/dev/null || \
+gcloud compute backend-services create my-ilb \
     --load-balancing-scheme=internal \
     --protocol=TCP \
     --region=$REGION \
     --health-checks=my-ilb-health-check
 
-gcloud compute backend-services add-backend my-ilb-backend-service \
+# Add instance-group-1
+gcloud compute backend-services add-backend my-ilb \
     --instance-group=instance-group-1 \
     --instance-group-zone=$ZONE_IG1 \
     --region=$REGION
 
-gcloud compute backend-services add-backend my-ilb-backend-service \
+# Add instance-group-2
+gcloud compute backend-services add-backend my-ilb \
     --instance-group=instance-group-2 \
     --instance-group-zone=$ZONE_IG2 \
     --region=$REGION
@@ -220,13 +251,15 @@ gcloud compute backend-services add-backend my-ilb-backend-service \
 
 #### 4.4 Create Forwarding Rule (`my-ilb`)
 ```bash
+gcloud compute forwarding-rules delete my-ilb --region=$REGION --quiet 2>/dev/null || true
+
 gcloud compute forwarding-rules create my-ilb \
     --load-balancing-scheme=internal \
     --ports=80 \
     --network=$NETWORK \
     --subnet=$SUBNET_B \
     --region=$REGION \
-    --backend-service=my-ilb-backend-service \
+    --backend-service=my-ilb \
     --backend-service-region=$REGION \
     --address=my-ilb-ip
 ```
@@ -255,8 +288,10 @@ You should see responses alternating between `instance-group-1` in `asia-east1-c
 ## 📁 Repository Structure
 
 ```
-├── setup_internal_lb.sh  # Complete end-to-end automation script
-├── commands.sh           # Clean, copy-paste ready gcloud commands
-├── verify.sh             # Health & verification test script
-└── README.md             # Lab guide and architecture documentation
+├── quicklab.sh             # Main automated script (runs all tasks 1-5)
+├── setup_internal_lb.sh    # Full setup script
+├── fix_backend_service.sh  # Standalone fix for Task 4 backend service check
+├── commands.sh             # Copy-paste CLI reference commands
+├── verify.sh               # Health check and verification script
+└── README.md               # Lab guide and architecture documentation
 ```

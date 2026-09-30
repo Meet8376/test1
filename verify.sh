@@ -31,6 +31,7 @@ gcloud compute instances list \
 echo -e "\n=========================================================="
 echo " 4. Load Balancer Backend Service Health"
 echo "=========================================================="
+gcloud compute backend-services get-health my-ilb --region="$REGION" 2>/dev/null || \
 gcloud compute backend-services get-health my-ilb-backend-service --region="$REGION" || true
 
 echo -e "\n=========================================================="
