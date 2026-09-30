@@ -93,26 +93,33 @@ else
     kubectl create deployment --image nginx nginx-1
 fi
 
-echo -e "${BLUE}[INFO] Waiting for nginx-1 deployment to roll out...${NC}"
-kubectl rollout status deployment/nginx-1 --timeout=300s || true
-
-# 2.2 Identify Pod Name
-my_nginx_pod=$(kubectl get pods -l app=nginx-1 -o jsonpath="{.items[0].metadata.name}" 2>/dev/null || echo "")
-if [ -z "$my_nginx_pod" ]; then
-    echo -e "${BLUE}[INFO] Waiting for nginx-1 Pod to initialize...${NC}"
-    sleep 10
-    my_nginx_pod=$(kubectl get pods -l app=nginx-1 -o jsonpath="{.items[0].metadata.name}")
-fi
-echo -e "${GREEN}[INFO] Deployed Pod: ${my_nginx_pod}${NC}"
-
-# 2.3 Create and copy test.html to Pod
+# Create test.html
 cat <<'EOF' > ~/test.html
  <header><title>This is title</title></head>
  Hello world 
 EOF
 
-echo -e "${BLUE}[INFO] Copying test.html to ${my_nginx_pod}:/usr/share/nginx/html/test.html...${NC}"
-kubectl cp ~/test.html "${my_nginx_pod}:/usr/share/nginx/html/test.html"
+echo -e "${BLUE}[INFO] Waiting for Autopilot to dynamically provision nodes and start nginx-1 Pod...${NC}"
+kubectl wait --for=condition=ready pod -l app=nginx-1 --timeout=360s || true
+
+# 2.2 Identify Pod Name
+my_nginx_pod=$(kubectl get pods -l app=nginx-1 -o jsonpath="{.items[0].metadata.name}" 2>/dev/null || echo "")
+if [ -z "$my_nginx_pod" ]; then
+    echo -e "${BLUE}[INFO] Waiting for nginx-1 Pod name...${NC}"
+    sleep 5
+    my_nginx_pod=$(kubectl get pods -l app=nginx-1 -o jsonpath="{.items[0].metadata.name}")
+fi
+echo -e "${GREEN}[INFO] Deployed Pod: ${my_nginx_pod}${NC}"
+
+# 2.3 Copy test.html to Pod (with retry)
+for i in {1..15}; do
+    if kubectl cp ~/test.html "${my_nginx_pod}:/usr/share/nginx/html/test.html" 2>/dev/null; then
+        echo -e "${GREEN}[SUCCESS] test.html successfully copied to ${my_nginx_pod}!${NC}"
+        break
+    fi
+    echo -e "${BLUE}[INFO] Waiting for ${my_nginx_pod} container to accept file copy ($i/15)...${NC}"
+    sleep 5
+done
 
 # 2.4 Expose Pod externally via LoadBalancer
 if kubectl get svc "$my_nginx_pod" &>/dev/null; then
@@ -152,11 +159,16 @@ echo -e "${BLUE}[INFO] Applying new-nginx-pod.yaml...${NC}"
 kubectl apply -f new-nginx-pod.yaml
 
 echo -e "${BLUE}[INFO] Waiting for 'new-nginx' Pod to be ready...${NC}"
-kubectl wait --for=condition=ready pod/new-nginx --timeout=300s || true
+kubectl wait --for=condition=ready pod/new-nginx --timeout=360s || true
 
-# Copy test.html into new-nginx as well
-echo -e "${BLUE}[INFO] Copying test.html to new-nginx pod...${NC}"
-kubectl cp ~/test.html new-nginx:/usr/share/nginx/html/test.html 2>/dev/null || true
+# Copy test.html into new-nginx as well (with retry)
+for i in {1..15}; do
+    if kubectl cp ~/test.html new-nginx:/usr/share/nginx/html/test.html 2>/dev/null; then
+        echo -e "${GREEN}[SUCCESS] test.html copied to new-nginx!${NC}"
+        break
+    fi
+    sleep 5
+done
 
 # Clone repository in background if needed
 if [ ! -d ~/training-data-analyst ]; then
