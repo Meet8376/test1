@@ -12,6 +12,7 @@ Collection of automated scripts and configurations for Google Cloud training lab
 4. [Automating the Deployment of Infrastructure Using Terraform (CBL036)](#4-automating-the-deployment-of-infrastructure-using-terraform-cbl036)
 5. [Accessing the Google Cloud Console and Cloud Shell (CBL138)](#5-accessing-the-google-cloud-console-and-cloud-shell-cbl138)
 6. [Working with Cloud Build (CBL139)](#6-working-with-cloud-build-cbl139)
+7. [Deploying GKE Autopilot Clusters](#7-deploying-gke-autopilot-clusters)
 
 ---
 
@@ -121,9 +122,26 @@ chmod +x quicklab_cloud_build.sh
 
 ---
 
+## 7. Deploying GKE Autopilot Clusters
+
+Provisions a fully-managed GKE Autopilot cluster (`autopilot-cluster-1`) in `us-east1` and deploys a sample 3-replica Nginx workload (`nginx-1`).
+
+### ⚡ Quick Start (Cloud Shell)
+
+```bash
+curl -sL "https://raw.githubusercontent.com/Meet8376/test1/main/quicklab_gke_autopilot.sh?cache=$(date +%s)" -o quicklab_gke_autopilot.sh
+
+chmod +x quicklab_gke_autopilot.sh
+
+./quicklab_gke_autopilot.sh
+```
+
+---
+
 ## 📁 Repository Structure
 
 ```
+├── quicklab_gke_autopilot.sh      # Automation for GKE Autopilot lab
 ├── quicklab_cloud_build.sh        # Automation for Cloud Build lab (CBL139)
 ├── quicklab_console_cloudshell.sh # Automation for Console & Cloud Shell lab (CBL138)
 ├── fix_first_vm.sh                # Task 1 & 3 quick fix for CBL138
