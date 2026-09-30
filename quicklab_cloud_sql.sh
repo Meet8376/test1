@@ -30,9 +30,16 @@ export REGION="${REGION:-us-west1}"
 export ZONE="${ZONE:-us-west1-a}"
 export ROOT_PASSWORD="${ROOT_PASSWORD:-Password123!}"
 
+# Resolve location flag: gcloud sql allows either --zone OR --region, never both
+LOCATION_FLAG=""
+if [ -n "${ZONE:-}" ]; then
+    LOCATION_FLAG="--zone=${ZONE}"
+else
+    LOCATION_FLAG="--region=${REGION:-us-west1}"
+fi
+
 echo -e "${BLUE}[INFO] Active Project: ${PROJECT_ID}${NC}"
-echo -e "${BLUE}[INFO] Target Region:   ${REGION}${NC}"
-echo -e "${BLUE}[INFO] Target Zone:     ${ZONE}${NC}"
+echo -e "${BLUE}[INFO] Location Flag:  ${LOCATION_FLAG}${NC}"
 echo -e "${BLUE}[INFO] Root Password:   ${ROOT_PASSWORD}${NC}"
 
 # ==============================================================================
@@ -63,14 +70,12 @@ if ! gcloud sql instances describe wordpress-db &>/dev/null; then
         --database-version=MYSQL_8_0 \
         --edition=ENTERPRISE \
         --tier=db-custom-1-3840 \
-        --region="$REGION" \
-        --zone="$ZONE" \
+        ${LOCATION_FLAG} \
         --root-password="$ROOT_PASSWORD" \
         --storage-type=SSD \
         --storage-size=10GB \
         --storage-auto-increase \
         --network=projects/$PROJECT_ID/global/networks/default \
-        --assign-ip \
         --ssl-mode=ALLOW_UNENCRYPTED_AND_ENCRYPTED \
         --quiet; then
 
@@ -78,13 +83,11 @@ if ! gcloud sql instances describe wordpress-db &>/dev/null; then
         gcloud sql instances create wordpress-db \
             --database-version=MYSQL_8_0 \
             --tier=db-custom-1-3840 \
-            --region="$REGION" \
-            --zone="$ZONE" \
+            ${LOCATION_FLAG} \
             --root-password="$ROOT_PASSWORD" \
             --storage-type=SSD \
             --storage-size=10GB \
             --network=projects/$PROJECT_ID/global/networks/default \
-            --assign-ip \
             --quiet
     fi
 else
@@ -139,46 +142,58 @@ fi
 echo -e "${BLUE}[INFO] Connecting to 'wordpress-proxy' in ${PROXY_ZONE}...${NC}"
 
 sleep 5
-gcloud compute ssh wordpress-proxy --zone="$PROXY_ZONE" --quiet --command="
-    wget -q https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
-    chmod +x cloud_sql_proxy
-    pkill -f cloud_sql_proxy || true
-    export SQL_CONNECTION=${SQL_CONNECTION_NAME}
-    nohup ./cloud_sql_proxy -instances=\$SQL_CONNECTION=tcp:3306 > /tmp/proxy.log 2>&1 &
-    sleep 3
-    echo 'Proxy Process Status:'
-    ps aux | grep cloud_sql_proxy | grep -v grep || true
+for attempt in {1..3}; do
+    echo -e "${BLUE}[INFO] SSH attempt $attempt to wordpress-proxy...${NC}"
+    if gcloud compute ssh wordpress-proxy --zone="$PROXY_ZONE" --quiet --command="
+        wget -q https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
+        chmod +x cloud_sql_proxy
+        pkill -f cloud_sql_proxy || true
+        export SQL_CONNECTION=${SQL_CONNECTION_NAME}
+        nohup ./cloud_sql_proxy -instances=\$SQL_CONNECTION=tcp:3306 > /tmp/proxy.log 2>&1 &
+        sleep 3
+        echo 'Proxy Process Status:'
+        ps aux | grep cloud_sql_proxy | grep -v grep || true
 
-    # Configure WordPress frontend
-    if [ -f /var/www/html/wp-config-sample.php ]; then
-        sudo sed -e 's/database_name_here/wordpress/' \
-                 -e 's/username_here/root/' \
-                 -e 's/password_here/${ROOT_PASSWORD}/' \
-                 -e 's/localhost/127.0.0.1/' \
-                 /var/www/html/wp-config-sample.php | sudo tee /var/www/html/wp-config.php > /dev/null
-        sudo chown www-data:www-data /var/www/html/wp-config.php 2>/dev/null || true
-        curl -s -d 'weblog_title=My+Blog&user_name=admin&admin_email=admin%40example.com&admin_password=${ROOT_PASSWORD}&pass1=${ROOT_PASSWORD}&pass2=${ROOT_PASSWORD}' 'http://localhost/wp-admin/install.php?step=2' > /dev/null || true
-    fi
-" 2>/dev/null || gcloud compute ssh wordpress-proxy --zone="$PROXY_ZONE" --tunnel-through-iap --quiet --command="
-    wget -q https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
-    chmod +x cloud_sql_proxy
-    pkill -f cloud_sql_proxy || true
-    export SQL_CONNECTION=${SQL_CONNECTION_NAME}
-    nohup ./cloud_sql_proxy -instances=\$SQL_CONNECTION=tcp:3306 > /tmp/proxy.log 2>&1 &
-    sleep 3
-    echo 'Proxy Process Status:'
-    ps aux | grep cloud_sql_proxy | grep -v grep || true
+        # Configure WordPress frontend
+        if [ -f /var/www/html/wp-config-sample.php ]; then
+            sudo sed -e 's/database_name_here/wordpress/' \
+                     -e 's/username_here/root/' \
+                     -e 's/password_here/${ROOT_PASSWORD}/' \
+                     -e 's/localhost/127.0.0.1/' \
+                     /var/www/html/wp-config-sample.php | sudo tee /var/www/html/wp-config.php > /dev/null
+            sudo chown www-data:www-data /var/www/html/wp-config.php 2>/dev/null || true
+            curl -s -d 'weblog_title=My+Blog&user_name=admin&admin_email=admin%40example.com&admin_password=${ROOT_PASSWORD}&pass1=${ROOT_PASSWORD}&pass2=${ROOT_PASSWORD}' 'http://localhost/wp-admin/install.php?step=2' > /dev/null || true
+        fi
+    " 2>/dev/null; then
+        echo -e "${GREEN}[SUCCESS] wordpress-proxy configured successfully!${NC}"
+        break
+    else
+        if gcloud compute ssh wordpress-proxy --zone="$PROXY_ZONE" --tunnel-through-iap --quiet --command="
+            wget -q https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
+            chmod +x cloud_sql_proxy
+            pkill -f cloud_sql_proxy || true
+            export SQL_CONNECTION=${SQL_CONNECTION_NAME}
+            nohup ./cloud_sql_proxy -instances=\$SQL_CONNECTION=tcp:3306 > /tmp/proxy.log 2>&1 &
+            sleep 3
+            echo 'Proxy Process Status:'
+            ps aux | grep cloud_sql_proxy | grep -v grep || true
 
-    if [ -f /var/www/html/wp-config-sample.php ]; then
-        sudo sed -e 's/database_name_here/wordpress/' \
-                 -e 's/username_here/root/' \
-                 -e 's/password_here/${ROOT_PASSWORD}/' \
-                 -e 's/localhost/127.0.0.1/' \
-                 /var/www/html/wp-config-sample.php | sudo tee /var/www/html/wp-config.php > /dev/null
-        sudo chown www-data:www-data /var/www/html/wp-config.php 2>/dev/null || true
-        curl -s -d 'weblog_title=My+Blog&user_name=admin&admin_email=admin%40example.com&admin_password=${ROOT_PASSWORD}&pass1=${ROOT_PASSWORD}&pass2=${ROOT_PASSWORD}' 'http://localhost/wp-admin/install.php?step=2' > /dev/null || true
+            if [ -f /var/www/html/wp-config-sample.php ]; then
+                sudo sed -e 's/database_name_here/wordpress/' \
+                         -e 's/username_here/root/' \
+                         -e 's/password_here/${ROOT_PASSWORD}/' \
+                         -e 's/localhost/127.0.0.1/' \
+                         /var/www/html/wp-config-sample.php | sudo tee /var/www/html/wp-config.php > /dev/null
+                sudo chown www-data:www-data /var/www/html/wp-config.php 2>/dev/null || true
+                curl -s -d 'weblog_title=My+Blog&user_name=admin&admin_email=admin%40example.com&admin_password=${ROOT_PASSWORD}&pass1=${ROOT_PASSWORD}&pass2=${ROOT_PASSWORD}' 'http://localhost/wp-admin/install.php?step=2' > /dev/null || true
+            fi
+        " 2>/dev/null; then
+            echo -e "${GREEN}[SUCCESS] wordpress-proxy configured via IAP tunnel!${NC}"
+            break
+        fi
     fi
-" || true
+    sleep 5
+done
 
 # ==============================================================================
 # TASK 4: Configure WordPress on wordpress-private-ip VM
@@ -188,27 +203,38 @@ echo -e "\n${YELLOW}>>> [Task 4/4] Configuring 'wordpress-private-ip' over Priva
 PRIVATE_VM_ZONE=$(gcloud compute instances list --filter="name=wordpress-private-ip" --format="value(zone)" | head -n1)
 if [ -n "$PRIVATE_VM_ZONE" ] && [ -n "$SQL_PRIVATE_IP" ]; then
     echo -e "${BLUE}[INFO] Connecting to 'wordpress-private-ip' in ${PRIVATE_VM_ZONE}...${NC}"
-    gcloud compute ssh wordpress-private-ip --zone="$PRIVATE_VM_ZONE" --quiet --command="
-        if [ -f /var/www/html/wp-config-sample.php ]; then
-            sudo sed -e 's/database_name_here/wordpress/' \
-                     -e 's/username_here/root/' \
-                     -e 's/password_here/${ROOT_PASSWORD}/' \
-                     -e 's/localhost/${SQL_PRIVATE_IP}/' \
-                     /var/www/html/wp-config-sample.php | sudo tee /var/www/html/wp-config.php > /dev/null
-            sudo chown www-data:www-data /var/www/html/wp-config.php 2>/dev/null || true
-            curl -s http://localhost/ > /dev/null || true
+    for attempt in {1..3}; do
+        if gcloud compute ssh wordpress-private-ip --zone="$PRIVATE_VM_ZONE" --quiet --command="
+            if [ -f /var/www/html/wp-config-sample.php ]; then
+                sudo sed -e 's/database_name_here/wordpress/' \
+                         -e 's/username_here/root/' \
+                         -e 's/password_here/${ROOT_PASSWORD}/' \
+                         -e 's/localhost/${SQL_PRIVATE_IP}/' \
+                         /var/www/html/wp-config-sample.php | sudo tee /var/www/html/wp-config.php > /dev/null
+                sudo chown www-data:www-data /var/www/html/wp-config.php 2>/dev/null || true
+                curl -s http://localhost/ > /dev/null || true
+            fi
+        " 2>/dev/null; then
+            echo -e "${GREEN}[SUCCESS] wordpress-private-ip configured!${NC}"
+            break
+        else
+            if gcloud compute ssh wordpress-private-ip --zone="$PRIVATE_VM_ZONE" --tunnel-through-iap --quiet --command="
+                if [ -f /var/www/html/wp-config-sample.php ]; then
+                    sudo sed -e 's/database_name_here/wordpress/' \
+                             -e 's/username_here/root/' \
+                             -e 's/password_here/${ROOT_PASSWORD}/' \
+                             -e 's/localhost/${SQL_PRIVATE_IP}/' \
+                             /var/www/html/wp-config-sample.php | sudo tee /var/www/html/wp-config.php > /dev/null
+                    sudo chown www-data:www-data /var/www/html/wp-config.php 2>/dev/null || true
+                    curl -s http://localhost/ > /dev/null || true
+                fi
+            " 2>/dev/null; then
+                echo -e "${GREEN}[SUCCESS] wordpress-private-ip configured via IAP tunnel!${NC}"
+                break
+            fi
         fi
-    " 2>/dev/null || gcloud compute ssh wordpress-private-ip --zone="$PRIVATE_VM_ZONE" --tunnel-through-iap --quiet --command="
-        if [ -f /var/www/html/wp-config-sample.php ]; then
-            sudo sed -e 's/database_name_here/wordpress/' \
-                     -e 's/username_here/root/' \
-                     -e 's/password_here/${ROOT_PASSWORD}/' \
-                     -e 's/localhost/${SQL_PRIVATE_IP}/' \
-                     /var/www/html/wp-config-sample.php | sudo tee /var/www/html/wp-config.php > /dev/null
-            sudo chown www-data:www-data /var/www/html/wp-config.php 2>/dev/null || true
-            curl -s http://localhost/ > /dev/null || true
-        fi
-    " || true
+        sleep 5
+    done
 fi
 
 # Fetch external IPs
