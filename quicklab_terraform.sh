@@ -143,7 +143,21 @@ echo -e "${BLUE}[INFO] Planning Terraform execution...${NC}"
 terraform plan
 
 echo -e "${BLUE}[INFO] Applying Terraform configuration (creating VPC, Firewall, and 2 VMs)...${NC}"
-terraform apply -auto-approve
+MAX_APPLY_RETRIES=4
+APPLY_SUCCESS=0
+for i in $(seq 1 $MAX_APPLY_RETRIES); do
+    if terraform apply -auto-approve; then
+        APPLY_SUCCESS=1
+        break
+    fi
+    echo -e "${YELLOW}[WARN] Subnets are still provisioning in GCP background. Waiting 15s before retry ($i/$MAX_APPLY_RETRIES)...${NC}"
+    sleep 15
+done
+
+if [ $APPLY_SUCCESS -ne 1 ]; then
+    echo -e "${RED}[ERROR] Terraform apply failed after $MAX_APPLY_RETRIES attempts.${NC}"
+    exit 1
+fi
 
 echo -e "\n${GREEN}[SUCCESS] Terraform infrastructure deployed successfully!${NC}"
 
