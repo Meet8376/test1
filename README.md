@@ -10,6 +10,7 @@ Collection of automated scripts and configurations for Google Cloud training lab
 2. [Configure an Application Load Balancer with Autoscaling (OCBL105)](#2-configure-an-application-load-balancer-with-autoscaling-ocbl105)
 3. [Configure an Internal Network Load Balancer (GSP041)](#3-configure-an-internal-network-load-balancer-gsp041)
 4. [Automating the Deployment of Infrastructure Using Terraform (CBL036)](#4-automating-the-deployment-of-infrastructure-using-terraform-cbl036)
+5. [Accessing the Google Cloud Console and Cloud Shell (CBL138)](#5-accessing-the-google-cloud-console-and-cloud-shell-cbl138)
 
 ---
 
@@ -87,19 +88,36 @@ sudo chmod +x quicklab_terraform.sh
 
 ---
 
+## 5. Accessing the Google Cloud Console and Cloud Shell (CBL138)
+
+Configures Compute Engine VM (`first-vm`) with HTTP firewall rules and an IAM Service Account (`test-service-account`), creates multi-region Cloud Storage buckets with uniform access and public read permissions, clones repository and customizes welcome page with Nginx on the VM.
+
+### ⚡ Quick Start (Cloud Shell)
+
+```bash
+curl -sL "https://raw.githubusercontent.com/Meet8376/test1/main/quicklab_console_cloudshell.sh?cache=$(date +%s)" -o quicklab_console_cloudshell.sh
+
+chmod +x quicklab_console_cloudshell.sh
+
+./quicklab_console_cloudshell.sh
+```
+
+---
+
 ## 📁 Repository Structure
 
 ```
-├── quicklab_cloud_sql.sh       # Automation for Cloud SQL lab (CBL037)
-├── quicklab_alb_autoscaling.sh # Automation for ALB with Autoscaling (OCBL105)
-├── fix_task6_stress_test.sh    # Task 6 quick fix for OCBL105
-├── quicklab.sh                 # Automation for Internal NLB lab (GSP041)
-├── quicklab_terraform.sh       # Automation for Terraform lab (CBL036)
-├── tfinfra/                    # Terraform configurations for CBL036
+├── quicklab_console_cloudshell.sh # Automation for Console & Cloud Shell lab (CBL138)
+├── quicklab_cloud_sql.sh          # Automation for Cloud SQL lab (CBL037)
+├── quicklab_alb_autoscaling.sh    # Automation for ALB with Autoscaling (OCBL105)
+├── fix_task6_stress_test.sh       # Task 6 quick fix for OCBL105
+├── quicklab.sh                    # Automation for Internal NLB lab (GSP041)
+├── quicklab_terraform.sh          # Automation for Terraform lab (CBL036)
+├── tfinfra/                       # Terraform configurations for CBL036
 │   ├── provider.tf
 │   ├── mynetwork.tf
 │   └── instance/
 │       ├── main.tf
 │       └── variables.tf
-└── README.md                   # Full documentation & guides
+└── README.md                      # Full documentation & guides
 ```
