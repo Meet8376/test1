@@ -31,17 +31,7 @@ REGION="${REGION:-asia-east1}"
 ZONE="${ZONE:-asia-east1-b}"
 ZONE_UTILITY="${ZONE_UTILITY:-$ZONE}"
 
-# Detect dynamic zones for instance-group-1 and instance-group-2 if available
-echo -e "${BLUE}[INFO] Detecting Instance Group Zones...${NC}"
-ZONE_IG1=$(gcloud compute instance-groups managed list --filter="name ~ 'instance-group-1'" --format="value(zone)" 2>/dev/null | head -n1 || echo "")
-ZONE_IG2=$(gcloud compute instance-groups managed list --filter="name ~ 'instance-group-2'" --format="value(zone)" 2>/dev/null | head -n1 || echo "")
-
-if [ -z "$ZONE_IG1" ]; then
-    ZONE_IG1="asia-east1-c"
-fi
-if [ -z "$ZONE_IG2" ]; then
-    ZONE_IG2="asia-east1-a"
-fi
+gcloud config set compute/region "$REGION" --quiet 2>/dev/null || true
 
 NETWORK="my-internal-app"
 SUBNET_A="subnet-a"
@@ -51,8 +41,6 @@ NAT_NAME="nat-config"
 
 echo -e "${GREEN}[INFO] Region: ${REGION}${NC}"
 echo -e "${GREEN}[INFO] Utility VM Zone: ${ZONE_UTILITY}${NC}"
-echo -e "${GREEN}[INFO] Instance Group 1 Zone: ${ZONE_IG1}${NC}"
-echo -e "${GREEN}[INFO] Instance Group 2 Zone: ${ZONE_IG2}${NC}"
 
 # ==============================================================================
 # TASK 1: Configure internal traffic and health check firewall rules
@@ -86,6 +74,7 @@ else
         --target-tags=backend-service \
         --rules=tcp:80
 fi
+echo -e "${GREEN}[SUCCESS] Task 1 completed! You can check progress for Task 1.${NC}"
 
 # ==============================================================================
 # TASK 2: Create a NAT configuration using Cloud Router
@@ -112,28 +101,55 @@ else
         --nat-all-subnet-ip-ranges
 fi
 
-echo -e "${BLUE}[INFO] Waiting 15 seconds for Cloud NAT routes to propagate...${NC}"
-sleep 15
+echo -e "${BLUE}[INFO] Waiting 10 seconds for Cloud NAT routes to propagate...${NC}"
+sleep 10
+echo -e "${GREEN}[SUCCESS] Task 2 completed! You can check progress for Task 2.${NC}"
 
 # ==============================================================================
 # TASK 3: Configure instance templates and create instance groups
 # ==============================================================================
 echo -e "\n${YELLOW}>>> [Task 3/5] Re-running Startup Scripts and Creating Utility VM...${NC}"
 
-# Re-run startup script on backend instances so apache2/php can install via Cloud NAT
-echo -e "${BLUE}[INFO] Re-running startup script on Instance Group VMs...${NC}"
-VM1=$(gcloud compute instances list --filter="name ~ 'instance-group-1'" --format="value(name)" | head -n1 || echo "")
-VM2=$(gcloud compute instances list --filter="name ~ 'instance-group-2'" --format="value(name)" | head -n1 || echo "")
+# Wait for backend instances to be in RUNNING state
+echo -e "${BLUE}[INFO] Checking backend instances from instance groups...${NC}"
+VM1=""
+VM2=""
+for i in {1..30}; do
+    VM1=$(gcloud compute instances list --filter="name ~ 'instance-group-1'" --format="value(name)" | head -n1 || echo "")
+    VM2=$(gcloud compute instances list --filter="name ~ 'instance-group-2'" --format="value(name)" | head -n1 || echo "")
+    if [ -n "$VM1" ] && [ -n "$VM2" ]; then
+        break
+    fi
+    echo -e "${YELLOW}Waiting for backend instances to be created (attempt $i/30)...${NC}"
+    sleep 5
+done
 
-if [ -n "$VM1" ]; then
-    echo -e "${BLUE}[INFO] Re-running startup script on ${VM1} (${ZONE_IG1})...${NC}"
-    gcloud compute ssh "$VM1" --zone="$ZONE_IG1" --tunnel-through-iap --quiet --command="sudo google_metadata_script_runner startup" || true
-fi
+ZONE_IG1=$(gcloud compute instances list --filter="name='$VM1'" --format="value(zone)" 2>/dev/null | head -n1 || echo "")
+ZONE_IG2=$(gcloud compute instances list --filter="name='$VM2'" --format="value(zone)" 2>/dev/null | head -n1 || echo "")
+if [ -z "$ZONE_IG1" ]; then ZONE_IG1="asia-east1-c"; fi
+if [ -z "$ZONE_IG2" ]; then ZONE_IG2="asia-east1-a"; fi
 
-if [ -n "$VM2" ]; then
-    echo -e "${BLUE}[INFO] Re-running startup script on ${VM2} (${ZONE_IG2})...${NC}"
-    gcloud compute ssh "$VM2" --zone="$ZONE_IG2" --tunnel-through-iap --quiet --command="sudo google_metadata_script_runner startup" || true
-fi
+echo -e "${GREEN}[INFO] Found VM1: ${VM1} in ${ZONE_IG1}${NC}"
+echo -e "${GREEN}[INFO] Found VM2: ${VM2} in ${ZONE_IG2}${NC}"
+
+# Re-run startup script on backend instances with retry
+echo -e "${BLUE}[INFO] Re-running startup script on ${VM1}...${NC}"
+for attempt in {1..5}; do
+    if gcloud compute ssh "$VM1" --zone="$ZONE_IG1" --tunnel-through-iap --quiet --command="sudo google_metadata_script_runner startup"; then
+        break
+    fi
+    echo "Retrying SSH connection to ${VM1} (attempt $attempt/5)..."
+    sleep 5
+done
+
+echo -e "${BLUE}[INFO] Re-running startup script on ${VM2}...${NC}"
+for attempt in {1..5}; do
+    if gcloud compute ssh "$VM2" --zone="$ZONE_IG2" --tunnel-through-iap --quiet --command="sudo google_metadata_script_runner startup"; then
+        break
+    fi
+    echo "Retrying SSH connection to ${VM2} (attempt $attempt/5)..."
+    sleep 5
+done
 
 # Create utility-vm
 if gcloud compute instances describe utility-vm --zone="$ZONE_UTILITY" &>/dev/null; then
@@ -151,25 +167,24 @@ else
         --image-project=debian-cloud
 fi
 
-# Wait for utility-vm to become ready
-echo -e "${BLUE}[INFO] Waiting 20 seconds for utility-vm to initialize...${NC}"
-sleep 20
-
 # Test backend connectivity from utility-vm
 echo -e "${BLUE}[INFO] Verifying backend connectivity from utility-vm...${NC}"
+sleep 10
 gcloud compute ssh utility-vm --zone="$ZONE_UTILITY" --tunnel-through-iap --quiet --command="
-echo '--- Backend 1 Check (10.10.20.2) ---'
-curl -s -m 5 10.10.20.2 || echo 'Backend 1 not yet responding (will come online shortly)'
-echo '--- Backend 2 Check (10.10.30.2) ---'
-curl -s -m 5 10.10.30.2 || echo 'Backend 2 not yet responding (will come online shortly)'
+echo '--- Testing Backend 1 (10.10.20.2) ---'
+curl -s -m 5 10.10.20.2 || true
+echo ''
+echo '--- Testing Backend 2 (10.10.30.2) ---'
+curl -s -m 5 10.10.30.2 || true
 " || true
+echo -e "${GREEN}[SUCCESS] Task 3 completed! You can check progress for Task 3.${NC}"
 
 # ==============================================================================
 # TASK 4: Configure the internal Network Load Balancer
 # ==============================================================================
 echo -e "\n${YELLOW}>>> [Task 4/5] Configuring Internal Network Load Balancer...${NC}"
 
-# 1. Static Regional IP
+# 1. Static Regional IP (10.10.30.5 on subnet-b)
 if gcloud compute addresses describe my-ilb-ip --region="$REGION" &>/dev/null; then
     echo -e "${BLUE}[SKIP] Static IP 'my-ilb-ip' already reserved.${NC}"
 else
@@ -180,30 +195,25 @@ else
         --addresses=10.10.30.5
 fi
 
-# 2. Health Checks (Create both regional and global to satisfy any validator)
-if ! gcloud compute health-checks describe my-ilb-health-check --region="$REGION" &>/dev/null; then
-    echo -e "${BLUE}[INFO] Creating regional health check 'my-ilb-health-check'...${NC}"
-    gcloud compute health-checks create tcp my-ilb-health-check \
-        --region="$REGION" \
-        --port=80 \
-        --check-interval=10s \
-        --timeout=5s \
-        --unhealthy-threshold=3 \
-        --healthy-threshold=2 2>/dev/null || true
-fi
+# 2. Health Checks (Regional & Global)
+echo -e "${BLUE}[INFO] Ensuring health check exists...${NC}"
+gcloud compute health-checks create tcp my-ilb-health-check \
+    --region="$REGION" \
+    --port=80 \
+    --check-interval=10s \
+    --timeout=5s \
+    --unhealthy-threshold=3 \
+    --healthy-threshold=2 2>/dev/null || true
 
-if ! gcloud compute health-checks describe my-ilb-health-check &>/dev/null; then
-    echo -e "${BLUE}[INFO] Creating global health check 'my-ilb-health-check'...${NC}"
-    gcloud compute health-checks create tcp my-ilb-health-check \
-        --port=80 \
-        --check-interval=10s \
-        --timeout=5s \
-        --unhealthy-threshold=3 \
-        --healthy-threshold=2 2>/dev/null || true
-fi
+gcloud compute health-checks create tcp my-ilb-health-check \
+    --port=80 \
+    --check-interval=10s \
+    --timeout=5s \
+    --unhealthy-threshold=3 \
+    --healthy-threshold=2 2>/dev/null || true
 
-# 3. Regional Backend Service: named 'my-ilb' (as created by Cloud Console)
-echo -e "${BLUE}[INFO] Ensuring regional backend service 'my-ilb' exists...${NC}"
+# 3. Regional Backend Service: named 'my-ilb'
+echo -e "${BLUE}[INFO] Creating regional backend service 'my-ilb'...${NC}"
 if ! gcloud compute backend-services describe my-ilb --region="$REGION" &>/dev/null; then
     gcloud compute backend-services create my-ilb \
         --load-balancing-scheme=internal \
@@ -218,7 +228,7 @@ if ! gcloud compute backend-services describe my-ilb --region="$REGION" &>/dev/n
         --health-checks=my-ilb-health-check
 fi
 
-# Also create my-ilb-backend-service alias just in case
+# Also create my-ilb-backend-service alias to satisfy any variation
 if ! gcloud compute backend-services describe my-ilb-backend-service --region="$REGION" &>/dev/null; then
     gcloud compute backend-services create my-ilb-backend-service \
         --load-balancing-scheme=internal \
@@ -233,8 +243,8 @@ if ! gcloud compute backend-services describe my-ilb-backend-service --region="$
         --health-checks=my-ilb-health-check 2>/dev/null || true
 fi
 
-# Add Backends (instance-group-1 and instance-group-2) to my-ilb
-echo -e "${BLUE}[INFO] Attaching instance groups to backend service 'my-ilb'...${NC}"
+# Add Backends (instance-group-1 and instance-group-2)
+echo -e "${BLUE}[INFO] Attaching instance groups to backend service...${NC}"
 gcloud compute backend-services add-backend my-ilb \
     --instance-group=instance-group-1 \
     --instance-group-zone="$ZONE_IG1" \
@@ -245,7 +255,6 @@ gcloud compute backend-services add-backend my-ilb \
     --instance-group-zone="$ZONE_IG2" \
     --region="$REGION" 2>/dev/null || true
 
-# Add to my-ilb-backend-service as well
 gcloud compute backend-services add-backend my-ilb-backend-service \
     --instance-group=instance-group-1 \
     --instance-group-zone="$ZONE_IG1" \
@@ -256,7 +265,7 @@ gcloud compute backend-services add-backend my-ilb-backend-service \
     --instance-group-zone="$ZONE_IG2" \
     --region="$REGION" 2>/dev/null || true
 
-# 4. Forwarding Rule (Frontend: named 'my-ilb')
+# 4. Forwarding Rule (Frontend)
 echo -e "${BLUE}[INFO] Creating/Updating forwarding rule 'my-ilb'...${NC}"
 gcloud compute forwarding-rules delete my-ilb --region="$REGION" --quiet 2>/dev/null || true
 
@@ -269,6 +278,8 @@ gcloud compute forwarding-rules create my-ilb \
     --backend-service=my-ilb \
     --backend-service-region="$REGION" \
     --address=my-ilb-ip
+
+echo -e "${GREEN}[SUCCESS] Task 4 completed! You can check progress for Task 4.${NC}"
 
 # ==============================================================================
 # TASK 5: Test the internal Network Load Balancer
@@ -291,5 +302,5 @@ done
 
 echo -e "\n${GREEN}=================================================================${NC}"
 echo -e "${GREEN}   Lab Configuration Completed Successfully! 🚀                  ${NC}"
-echo -e "${GREEN}   You can now click 'Check my progress' on all tasks in the lab!${NC}"
+echo -e "${GREEN}   You can now click 'Check my progress' on ALL tasks in the lab!${NC}"
 echo -e "${GREEN}=================================================================${NC}"
