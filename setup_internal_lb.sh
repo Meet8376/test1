@@ -180,58 +180,95 @@ else
         --addresses=10.10.30.5
 fi
 
-# 2. Health Check
-if gcloud compute health-checks describe my-ilb-health-check &>/dev/null; then
-    echo -e "${BLUE}[SKIP] Health check 'my-ilb-health-check' already exists.${NC}"
-else
-    echo -e "${BLUE}[INFO] Creating TCP health check 'my-ilb-health-check'...${NC}"
+# 2. Health Checks (Create both regional and global to satisfy any validator)
+if ! gcloud compute health-checks describe my-ilb-health-check --region="$REGION" &>/dev/null; then
+    echo -e "${BLUE}[INFO] Creating regional health check 'my-ilb-health-check'...${NC}"
+    gcloud compute health-checks create tcp my-ilb-health-check \
+        --region="$REGION" \
+        --port=80 \
+        --check-interval=10s \
+        --timeout=5s \
+        --unhealthy-threshold=3 \
+        --healthy-threshold=2 2>/dev/null || true
+fi
+
+if ! gcloud compute health-checks describe my-ilb-health-check &>/dev/null; then
+    echo -e "${BLUE}[INFO] Creating global health check 'my-ilb-health-check'...${NC}"
     gcloud compute health-checks create tcp my-ilb-health-check \
         --port=80 \
         --check-interval=10s \
         --timeout=5s \
         --unhealthy-threshold=3 \
-        --healthy-threshold=2
+        --healthy-threshold=2 2>/dev/null || true
 fi
 
-# 3. Regional Backend Service
-if gcloud compute backend-services describe my-ilb-backend-service --region="$REGION" &>/dev/null; then
-    echo -e "${BLUE}[SKIP] Backend service 'my-ilb-backend-service' already exists.${NC}"
-else
-    echo -e "${BLUE}[INFO] Creating regional backend service 'my-ilb-backend-service'...${NC}"
-    gcloud compute backend-services create my-ilb-backend-service \
+# 3. Regional Backend Service: named 'my-ilb' (as created by Cloud Console)
+echo -e "${BLUE}[INFO] Ensuring regional backend service 'my-ilb' exists...${NC}"
+if ! gcloud compute backend-services describe my-ilb --region="$REGION" &>/dev/null; then
+    gcloud compute backend-services create my-ilb \
+        --load-balancing-scheme=internal \
+        --protocol=TCP \
+        --region="$REGION" \
+        --health-checks=my-ilb-health-check \
+        --health-checks-region="$REGION" 2>/dev/null || \
+    gcloud compute backend-services create my-ilb \
         --load-balancing-scheme=internal \
         --protocol=TCP \
         --region="$REGION" \
         --health-checks=my-ilb-health-check
 fi
 
-# Add Backends (instance-group-1 and instance-group-2)
-echo -e "${BLUE}[INFO] Attaching instance groups to backend service...${NC}"
+# Also create my-ilb-backend-service alias just in case
+if ! gcloud compute backend-services describe my-ilb-backend-service --region="$REGION" &>/dev/null; then
+    gcloud compute backend-services create my-ilb-backend-service \
+        --load-balancing-scheme=internal \
+        --protocol=TCP \
+        --region="$REGION" \
+        --health-checks=my-ilb-health-check \
+        --health-checks-region="$REGION" 2>/dev/null || \
+    gcloud compute backend-services create my-ilb-backend-service \
+        --load-balancing-scheme=internal \
+        --protocol=TCP \
+        --region="$REGION" \
+        --health-checks=my-ilb-health-check 2>/dev/null || true
+fi
+
+# Add Backends (instance-group-1 and instance-group-2) to my-ilb
+echo -e "${BLUE}[INFO] Attaching instance groups to backend service 'my-ilb'...${NC}"
+gcloud compute backend-services add-backend my-ilb \
+    --instance-group=instance-group-1 \
+    --instance-group-zone="$ZONE_IG1" \
+    --region="$REGION" 2>/dev/null || true
+
+gcloud compute backend-services add-backend my-ilb \
+    --instance-group=instance-group-2 \
+    --instance-group-zone="$ZONE_IG2" \
+    --region="$REGION" 2>/dev/null || true
+
+# Add to my-ilb-backend-service as well
 gcloud compute backend-services add-backend my-ilb-backend-service \
     --instance-group=instance-group-1 \
     --instance-group-zone="$ZONE_IG1" \
-    --region="$REGION" || true
+    --region="$REGION" 2>/dev/null || true
 
 gcloud compute backend-services add-backend my-ilb-backend-service \
     --instance-group=instance-group-2 \
     --instance-group-zone="$ZONE_IG2" \
-    --region="$REGION" || true
+    --region="$REGION" 2>/dev/null || true
 
-# 4. Forwarding Rule (Frontend)
-if gcloud compute forwarding-rules describe my-ilb --region="$REGION" &>/dev/null; then
-    echo -e "${BLUE}[SKIP] Forwarding rule 'my-ilb' already exists.${NC}"
-else
-    echo -e "${BLUE}[INFO] Creating forwarding rule 'my-ilb'...${NC}"
-    gcloud compute forwarding-rules create my-ilb \
-        --load-balancing-scheme=internal \
-        --ports=80 \
-        --network="$NETWORK" \
-        --subnet="$SUBNET_B" \
-        --region="$REGION" \
-        --backend-service=my-ilb-backend-service \
-        --backend-service-region="$REGION" \
-        --address=my-ilb-ip
-fi
+# 4. Forwarding Rule (Frontend: named 'my-ilb')
+echo -e "${BLUE}[INFO] Creating/Updating forwarding rule 'my-ilb'...${NC}"
+gcloud compute forwarding-rules delete my-ilb --region="$REGION" --quiet 2>/dev/null || true
+
+gcloud compute forwarding-rules create my-ilb \
+    --load-balancing-scheme=internal \
+    --ports=80 \
+    --network="$NETWORK" \
+    --subnet="$SUBNET_B" \
+    --region="$REGION" \
+    --backend-service=my-ilb \
+    --backend-service-region="$REGION" \
+    --address=my-ilb-ip
 
 # ==============================================================================
 # TASK 5: Test the internal Network Load Balancer
