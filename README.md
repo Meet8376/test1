@@ -15,6 +15,7 @@ Collection of automated scripts and configurations for Google Cloud training lab
 7. [Deploying GKE Autopilot Clusters](#7-deploying-gke-autopilot-clusters)
 8. [Deploying GKE Autopilot Clusters from Cloud Shell](#8-deploying-gke-autopilot-clusters-from-cloud-shell)
 9. [Implementing Least Privilege IAM Policy Bindings in Cloud Run (CBL418)](#9-implementing-least-privilege-iam-policy-bindings-in-cloud-run-cbl418)
+10. [Using Cloud Pub/Sub with Cloud Run (CBL396)](#10-using-cloud-pubsub-with-cloud-run-cbl396)
 
 ---
 
@@ -172,9 +173,26 @@ chmod +x quicklab_least_privilege_cloud_run.sh
 
 ---
 
+## 10. Using Cloud Pub/Sub with Cloud Run (CBL396)
+
+Integrates Cloud Run microservices with Google Cloud Pub/Sub: deploys a public producer (`store-service`) and a private consumer (`order-service`), creates the `ORDER_PLACED` topic, provisions an authorized invoker service account (`pubsub-cloud-run-invoker`), configures push subscriptions, and tests end-to-end event-driven message delivery.
+
+### ⚡ Quick Start (Cloud Shell)
+
+```bash
+curl -sL "https://raw.githubusercontent.com/Meet8376/test1/main/quicklab_pubsub_cloud_run.sh?cache=$(date +%s)" -o quicklab_pubsub_cloud_run.sh
+
+chmod +x quicklab_pubsub_cloud_run.sh
+
+./quicklab_pubsub_cloud_run.sh
+```
+
+---
+
 ## 📁 Repository Structure
 
 ```
+├── quicklab_pubsub_cloud_run.sh          # Automation for Pub/Sub with Cloud Run lab (CBL396)
 ├── quicklab_least_privilege_cloud_run.sh # Automation for Least Privilege Cloud Run lab (CBL418)
 ├── quicklab_gke_cloudshell.sh            # Automation for GKE from Cloud Shell lab
 ├── quicklab_gke_autopilot.sh             # Automation for GKE Autopilot lab
