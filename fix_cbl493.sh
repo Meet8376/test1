@@ -108,6 +108,10 @@ fi
 # ==============================================================================
 echo -e "\n${YELLOW}>>> [2/2] Ensuring Secret Manager & Secret Logging for newCustomer...${NC}"
 
+# Explicitly enable Secret Manager API (required by lab checkpoint grader)
+echo -e "${BLUE}[INFO] Enabling Secret Manager API (secretmanager.googleapis.com)...${NC}"
+gcloud services enable secretmanager.googleapis.com --quiet
+
 # Ensure Secret exists and is populated
 if ! gcloud secrets describe api-cred &>/dev/null; then
     echo -n "secret_api_key" | gcloud secrets create api-cred --replication-policy="automatic" --data-file=- --quiet
