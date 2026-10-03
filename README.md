@@ -17,6 +17,7 @@ Collection of automated scripts and configurations for Google Cloud training lab
 9. [Implementing Least Privilege IAM Policy Bindings in Cloud Run (CBL418)](#9-implementing-least-privilege-iam-policy-bindings-in-cloud-run-cbl418)
 10. [Using Cloud Pub/Sub with Cloud Run (CBL396)](#10-using-cloud-pubsub-with-cloud-run-cbl396)
 11. [Develop and Deploy Cloud Run Functions (CBL491)](#11-develop-and-deploy-cloud-run-functions-cbl491)
+12. [Connect Cloud Run Functions (CBL492)](#12-connect-cloud-run-functions-cbl492)
 
 ---
 
@@ -206,28 +207,45 @@ chmod +x quicklab_cloud_run_functions.sh
 
 ---
 
+## 12. Connect Cloud Run Functions (CBL492)
+
+Provisions Memorystore for Redis (`customerdb`), configures Serverless VPC Access (`test-connector`), connects event-driven Pub/Sub and HTTP Cloud Run functions to the internal Redis instance, and connects to an internal Compute Engine web server VM using VPC egress.
+
+### ⚡ Quick Start (Cloud Shell)
+
+```bash
+curl -sL "https://raw.githubusercontent.com/Meet8376/test1/main/quicklab_connect_cloud_run_functions.sh?cache=$(date +%s)" -o quicklab_connect_cloud_run_functions.sh
+
+chmod +x quicklab_connect_cloud_run_functions.sh
+
+./quicklab_connect_cloud_run_functions.sh
+```
+
+---
+
 ## 📁 Repository Structure
 
 ```
-├── quicklab_cloud_run_functions.sh       # Automation for Cloud Run Functions lab (CBL491)
-├── quicklab_pubsub_cloud_run.sh          # Automation for Pub/Sub with Cloud Run lab (CBL396)
-├── quicklab_least_privilege_cloud_run.sh # Automation for Least Privilege Cloud Run lab (CBL418)
-├── quicklab_gke_cloudshell.sh            # Automation for GKE from Cloud Shell lab
-├── quicklab_gke_autopilot.sh             # Automation for GKE Autopilot lab
-├── quicklab_cloud_build.sh               # Automation for Cloud Build lab (CBL139)
-├── quicklab_console_cloudshell.sh        # Automation for Console & Cloud Shell lab (CBL138)
-├── fix_first_vm.sh                       # Task 1 & 3 quick fix for CBL138
-├── quicklab_cloud_sql.sh                 # Automation for Cloud SQL lab (CBL037)
-├── fix_task2_proxy.sh                    # Task 2 quick fix for CBL037
-├── quicklab_alb_autoscaling.sh           # Automation for ALB with Autoscaling (OCBL105)
-├── fix_task6_stress_test.sh              # Task 6 quick fix for OCBL105
-├── quicklab.sh                           # Automation for Internal NLB lab (GSP041)
-├── quicklab_terraform.sh                 # Automation for Terraform lab (CBL036)
-├── tfinfra/                              # Terraform configurations for CBL036
+├── quicklab_connect_cloud_run_functions.sh # Automation for Connect Cloud Run Functions (CBL492)
+├── quicklab_cloud_run_functions.sh         # Automation for Cloud Run Functions lab (CBL491)
+├── quicklab_pubsub_cloud_run.sh            # Automation for Pub/Sub with Cloud Run lab (CBL396)
+├── quicklab_least_privilege_cloud_run.sh   # Automation for Least Privilege Cloud Run lab (CBL418)
+├── quicklab_gke_cloudshell.sh              # Automation for GKE from Cloud Shell lab
+├── quicklab_gke_autopilot.sh               # Automation for GKE Autopilot lab
+├── quicklab_cloud_build.sh                 # Automation for Cloud Build lab (CBL139)
+├── quicklab_console_cloudshell.sh          # Automation for Console & Cloud Shell lab (CBL138)
+├── fix_first_vm.sh                         # Task 1 & 3 quick fix for CBL138
+├── quicklab_cloud_sql.sh                   # Automation for Cloud SQL lab (CBL037)
+├── fix_task2_proxy.sh                      # Task 2 quick fix for CBL037
+├── quicklab_alb_autoscaling.sh             # Automation for ALB with Autoscaling (OCBL105)
+├── fix_task6_stress_test.sh                # Task 6 quick fix for OCBL105
+├── quicklab.sh                             # Automation for Internal NLB lab (GSP041)
+├── quicklab_terraform.sh                   # Automation for Terraform lab (CBL036)
+├── tfinfra/                                # Terraform configurations for CBL036
 │   ├── provider.tf
 │   ├── mynetwork.tf
 │   └── instance/
 │       ├── main.tf
 │       └── variables.tf
-└── README.md                             # Full documentation & guides
+└── README.md                               # Full documentation & guides
 ```
