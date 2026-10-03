@@ -16,6 +16,7 @@ Collection of automated scripts and configurations for Google Cloud training lab
 8. [Deploying GKE Autopilot Clusters from Cloud Shell](#8-deploying-gke-autopilot-clusters-from-cloud-shell)
 9. [Implementing Least Privilege IAM Policy Bindings in Cloud Run (CBL418)](#9-implementing-least-privilege-iam-policy-bindings-in-cloud-run-cbl418)
 10. [Using Cloud Pub/Sub with Cloud Run (CBL396)](#10-using-cloud-pubsub-with-cloud-run-cbl396)
+11. [Develop and Deploy Cloud Run Functions (CBL491)](#11-develop-and-deploy-cloud-run-functions-cbl491)
 
 ---
 
@@ -189,9 +190,26 @@ chmod +x quicklab_pubsub_cloud_run.sh
 
 ---
 
+## 11. Develop and Deploy Cloud Run Functions (CBL491)
+
+Deploys 2nd Generation Cloud Run functions: an authenticated HTTP function (`temperature-converter`), an event-driven Cloud Storage trigger (`temperature-data-checker`), and creates service revisions with environment variable configurations (`TEMP_CONVERT_TO=ctof`).
+
+### ⚡ Quick Start (Cloud Shell)
+
+```bash
+curl -sL "https://raw.githubusercontent.com/Meet8376/test1/main/quicklab_cloud_run_functions.sh?cache=$(date +%s)" -o quicklab_cloud_run_functions.sh
+
+chmod +x quicklab_cloud_run_functions.sh
+
+./quicklab_cloud_run_functions.sh
+```
+
+---
+
 ## 📁 Repository Structure
 
 ```
+├── quicklab_cloud_run_functions.sh       # Automation for Cloud Run Functions lab (CBL491)
 ├── quicklab_pubsub_cloud_run.sh          # Automation for Pub/Sub with Cloud Run lab (CBL396)
 ├── quicklab_least_privilege_cloud_run.sh # Automation for Least Privilege Cloud Run lab (CBL418)
 ├── quicklab_gke_cloudshell.sh            # Automation for GKE from Cloud Shell lab
