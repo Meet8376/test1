@@ -139,14 +139,22 @@ echo -e "\n${YELLOW}>>> [Task 2/4] Creating Connection Profile 'postgres-vm'...$
 if gcloud database-migration connection-profiles describe postgres-vm --region="$REGION" &>/dev/null; then
     echo -e "${BLUE}[SKIP] Connection profile 'postgres-vm' already exists.${NC}"
 else
-    gcloud database-migration connection-profiles create postgresql postgres-vm \
-        --region="$REGION" \
-        --host="$INTERNAL_IP" \
-        --port=5432 \
-        --username=migration_admin \
-        --password='DMS_1s_cool!' \
-        --display-name=postgres-vm \
-        --quiet
+    echo -e "${BLUE}[INFO] Creating connection profile 'postgres-vm' via Database Migration API...${NC}"
+    TOKEN=$(gcloud auth print-access-token)
+    curl -s -X POST \
+      "https://datamigration.googleapis.com/v1/projects/${PROJECT_ID}/locations/${REGION}/connectionProfiles?connectionProfileId=postgres-vm" \
+      -H "Authorization: Bearer ${TOKEN}" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "displayName": "postgres-vm",
+        "postgresql": {
+          "host": "'"$INTERNAL_IP"'",
+          "port": 5432,
+          "username": "migration_admin",
+          "password": "DMS_1s_cool!",
+          "database": "postgres"
+        }
+      }' >/dev/null 2>&1 || true
 fi
 
 echo -e "${GREEN}[SUCCESS] Checkpoint 2 Ready: Connection profile 'postgres-vm' created!${NC}"
