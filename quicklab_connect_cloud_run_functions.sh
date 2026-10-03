@@ -222,7 +222,7 @@ echo -e "${GREEN}[SUCCESS] Checkpoint 4 Ready: HTTP function querying Redis depl
 # ==============================================================================
 echo -e "\n${YELLOW}>>> [Task 6/6] Creating VM and Connecting via HTTP Function with VPC Connector...${NC}"
 cd ~
-gcloud storage cp gs://cloud-training/CBL492/startup.sh ~/startup.sh 2>/dev/null || cat <<'EOF' > ~/startup.sh
+gcloud storage cp gs://cloud-training/CBL492/startup.sh ./startup.sh 2>/dev/null || cat <<'EOF' > ./startup.sh
 #!/bin/bash
 apt-get update
 apt-get install -y apache2
@@ -240,7 +240,7 @@ else
     gcloud compute instances create webserver-vm \
       --image-project=debian-cloud \
       --image-family=debian-12 \
-      --metadata-from-file=startup-script=~/startup.sh \
+      --metadata-from-file=startup-script=./startup.sh \
       --machine-type e2-standard-2 \
       --tags=http-server \
       --scopes=https://www.googleapis.com/auth/cloud-platform \
