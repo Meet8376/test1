@@ -14,6 +14,7 @@ Collection of automated scripts and configurations for Google Cloud training lab
 6. [Working with Cloud Build (CBL139)](#6-working-with-cloud-build-cbl139)
 7. [Deploying GKE Autopilot Clusters](#7-deploying-gke-autopilot-clusters)
 8. [Deploying GKE Autopilot Clusters from Cloud Shell](#8-deploying-gke-autopilot-clusters-from-cloud-shell)
+9. [Implementing Least Privilege IAM Policy Bindings in Cloud Run (CBL418)](#9-implementing-least-privilege-iam-policy-bindings-in-cloud-run-cbl418)
 
 ---
 
@@ -155,25 +156,42 @@ chmod +x quicklab_gke_cloudshell.sh
 
 ---
 
+## 9. Implementing Least Privilege IAM Policy Bindings in Cloud Run (CBL418)
+
+Deploys Cloud Run services, secures endpoints by enforcing authentication, creates dedicated service accounts (`Billing Initiator`), tests token-based authenticated invocations, and enforces least-privilege IAM bindings directly on target services.
+
+### ⚡ Quick Start (Cloud Shell)
+
+```bash
+curl -sL "https://raw.githubusercontent.com/Meet8376/test1/main/quicklab_least_privilege_cloud_run.sh?cache=$(date +%s)" -o quicklab_least_privilege_cloud_run.sh
+
+chmod +x quicklab_least_privilege_cloud_run.sh
+
+./quicklab_least_privilege_cloud_run.sh
+```
+
+---
+
 ## 📁 Repository Structure
 
 ```
-├── quicklab_gke_cloudshell.sh     # Automation for GKE from Cloud Shell lab
-├── quicklab_gke_autopilot.sh      # Automation for GKE Autopilot lab
-├── quicklab_cloud_build.sh        # Automation for Cloud Build lab (CBL139)
-├── quicklab_console_cloudshell.sh # Automation for Console & Cloud Shell lab (CBL138)
-├── fix_first_vm.sh                # Task 1 & 3 quick fix for CBL138
-├── quicklab_cloud_sql.sh          # Automation for Cloud SQL lab (CBL037)
-├── fix_task2_proxy.sh             # Task 2 quick fix for CBL037
-├── quicklab_alb_autoscaling.sh    # Automation for ALB with Autoscaling (OCBL105)
-├── fix_task6_stress_test.sh       # Task 6 quick fix for OCBL105
-├── quicklab.sh                    # Automation for Internal NLB lab (GSP041)
-├── quicklab_terraform.sh          # Automation for Terraform lab (CBL036)
-├── tfinfra/                       # Terraform configurations for CBL036
+├── quicklab_least_privilege_cloud_run.sh # Automation for Least Privilege Cloud Run lab (CBL418)
+├── quicklab_gke_cloudshell.sh            # Automation for GKE from Cloud Shell lab
+├── quicklab_gke_autopilot.sh             # Automation for GKE Autopilot lab
+├── quicklab_cloud_build.sh               # Automation for Cloud Build lab (CBL139)
+├── quicklab_console_cloudshell.sh        # Automation for Console & Cloud Shell lab (CBL138)
+├── fix_first_vm.sh                       # Task 1 & 3 quick fix for CBL138
+├── quicklab_cloud_sql.sh                 # Automation for Cloud SQL lab (CBL037)
+├── fix_task2_proxy.sh                    # Task 2 quick fix for CBL037
+├── quicklab_alb_autoscaling.sh           # Automation for ALB with Autoscaling (OCBL105)
+├── fix_task6_stress_test.sh              # Task 6 quick fix for OCBL105
+├── quicklab.sh                           # Automation for Internal NLB lab (GSP041)
+├── quicklab_terraform.sh                 # Automation for Terraform lab (CBL036)
+├── tfinfra/                              # Terraform configurations for CBL036
 │   ├── provider.tf
 │   ├── mynetwork.tf
 │   └── instance/
 │       ├── main.tf
 │       └── variables.tf
-└── README.md                      # Full documentation & guides
+└── README.md                             # Full documentation & guides
 ```
