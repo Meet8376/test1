@@ -132,32 +132,26 @@ else
     cat <<'EOF' > /tmp/dashboard_cbl012.json
 {
   "displayName": "My Dashboard",
-  "mosaicLayout": {
-    "columns": 12,
-    "tiles": [
+  "gridLayout": {
+    "columns": "2",
+    "widgets": [
       {
-        "xPos": 0,
-        "yPos": 0,
-        "width": 6,
-        "height": 4,
-        "widget": {
-          "title": "My Chart",
-          "xyChart": {
-            "dataSets": [
-              {
-                "timeSeriesQuery": {
-                  "timeSeriesFilter": {
-                    "filter": "metric.type=\"compute.googleapis.com/instance/cpu/utilization\" resource.type=\"gce_instance\"",
-                    "aggregation": {
-                      "alignmentPeriod": "60s",
-                      "perSeriesAligner": "ALIGN_MEAN"
-                    }
+        "title": "My Chart",
+        "xyChart": {
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "metric.type=\"compute.googleapis.com/instance/cpu/utilization\" resource.type=\"gce_instance\"",
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_MEAN"
                   }
-                },
-                "plotType": "LINE"
-              }
-            ]
-          }
+                }
+              },
+              "plotType": "LINE"
+            }
+          ]
         }
       }
     ]
@@ -311,28 +305,31 @@ if [ -n "$GROUP_FULL_NAME" ]; then
     echo -e "${BLUE}[SKIP] Resource group 'VM instances' already exists (${GROUP_FULL_NAME}).${NC}"
 else
     echo -e "${BLUE}[INFO] Creating Resource Group 'VM instances' with criteria 'nginx'...${NC}"
-    GROUP_CREATE_RESP=$(curl -s -X POST \
-        -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-        -H "Content-Type: application/json" \
-        "https://monitoring.googleapis.com/v3/projects/${PROJECT_ID}/groups" \
-        -d '{
-            "displayName": "VM instances",
-            "filter": "resource.metadata.name=starts_with(\"nginx\")"
-        }')
-    GROUP_FULL_NAME=$(echo "$GROUP_CREATE_RESP" | python3 -c "import sys, json; print(json.load(sys.stdin).get('name', ''))" 2>/dev/null || echo "")
-
-    if [ -z "$GROUP_FULL_NAME" ]; then
-        # Try alternate substring filter if starts_with returned error
+    FILTERS=(
+        'resource.type = "gce_instance" AND resource.metadata.name = starts_with("nginx")'
+        'resource.type = "gce_instance" AND metadata.system_labels.name = starts_with("nginx")'
+        'resource.type = "gce_instance" AND resource.metadata.name = has_substring("nginx")'
+        'resource.metadata.name = has_substring("nginx")'
+    )
+    for F in "${FILTERS[@]}"; do
         GROUP_CREATE_RESP=$(curl -s -X POST \
             -H "Authorization: Bearer ${ACCESS_TOKEN}" \
             -H "Content-Type: application/json" \
             "https://monitoring.googleapis.com/v3/projects/${PROJECT_ID}/groups" \
-            -d '{
-                "displayName": "VM instances",
-                "filter": "resource.metadata.name = has_substring(\"nginx\")"
-            }')
+            -d "{
+                \"displayName\": \"VM instances\",
+                \"filter\": \"${F}\"
+            }")
         GROUP_FULL_NAME=$(echo "$GROUP_CREATE_RESP" | python3 -c "import sys, json; print(json.load(sys.stdin).get('name', ''))" 2>/dev/null || echo "")
-    fi
+        if [ -n "$GROUP_FULL_NAME" ]; then
+            MEMBERS=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://monitoring.googleapis.com/v3/${GROUP_FULL_NAME}/members")
+            COUNT=$(echo "$MEMBERS" | grep -o "nginxstack" | wc -l)
+            if [ "$COUNT" -ge 1 ]; then
+                echo -e "${GREEN}[SUCCESS] Group created and matched ${COUNT} VM instances!${NC}"
+                break
+            fi
+        fi
+    done
     echo -e "${GREEN}[SUCCESS] Checkpoint 3 Complete: Resource Group 'VM instances' created!${NC}"
 fi
 

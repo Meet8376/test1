@@ -266,12 +266,15 @@ export USER_EMAIL=your-email@example.com
 ./quicklab_observability.sh
 ```
 
+*(Note: For Task 2 and Task 4 quick checkpoint fix, run: `curl -sL "https://raw.githubusercontent.com/Meet8376/test1/main/fix_cbl012.sh?cache=$(date +%s)" -o fix_cbl012.sh && chmod +x fix_cbl012.sh && ./fix_cbl012.sh`)*
+
 ---
 
 ## 📁 Repository Structure
 
 ```
 ├── quicklab_observability.sh                 # Automation for Cloud Observability lab (CBL012)
+├── fix_cbl012.sh                             # Task 2 & Task 4 quick fix for CBL012
 ├── quicklab_firestore_cloud_run_functions.sh # Automation for Firestore with Cloud Run Functions (CBL493)
 ├── quicklab_connect_cloud_run_functions.sh   # Automation for Connect Cloud Run Functions (CBL492)
 ├── quicklab_cloud_run_functions.sh           # Automation for Cloud Run Functions lab (CBL491)
