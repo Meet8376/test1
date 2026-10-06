@@ -19,6 +19,7 @@ Collection of automated scripts and configurations for Google Cloud training lab
 11. [Develop and Deploy Cloud Run Functions (CBL491)](#11-develop-and-deploy-cloud-run-functions-cbl491)
 12. [Connect Cloud Run Functions (CBL492)](#12-connect-cloud-run-functions-cbl492)
 13. [Integrate Cloud Run Functions with Firestore (CBL493)](#13-integrate-cloud-run-functions-with-firestore-cbl493)
+14. [Monitor Resources with Google Cloud Observability (CBL012)](#14-monitor-resources-with-google-cloud-observability-cbl012)
 
 ---
 
@@ -240,9 +241,37 @@ chmod +x quicklab_firestore_cloud_run_functions.sh
 
 ---
 
+## 14. Monitor Resources with Google Cloud Observability (CBL012)
+
+Configures Google Cloud Observability: creates custom dashboards with line charts for VM CPU utilization (`My Dashboard`), sets up multi-condition alerting policies for CPU usage and utilization with email notification channels (`My Alert Policy`), defines resource groups for Nginx instances (`VM instances`), provisions HTTP uptime checks with automated alert policies (`My Uptime check`), and verifies lab objectives before disabling alerts.
+
+### ⚡ Quick Start (Cloud Shell)
+
+Run this single command in **Google Cloud Shell**:
+
+```bash
+curl -sL "https://raw.githubusercontent.com/Meet8376/test1/main/quicklab_observability.sh?cache=$(date +%s)" -o quicklab_observability.sh
+
+chmod +x quicklab_observability.sh
+
+./quicklab_observability.sh
+```
+
+*(Optional: You can also predefine parameters using environment variables:)*
+```bash
+export REGION=us-central1
+export ZONE=us-central1-a
+export USER_EMAIL=your-email@example.com
+
+./quicklab_observability.sh
+```
+
+---
+
 ## 📁 Repository Structure
 
 ```
+├── quicklab_observability.sh                 # Automation for Cloud Observability lab (CBL012)
 ├── quicklab_firestore_cloud_run_functions.sh # Automation for Firestore with Cloud Run Functions (CBL493)
 ├── quicklab_connect_cloud_run_functions.sh   # Automation for Connect Cloud Run Functions (CBL492)
 ├── quicklab_cloud_run_functions.sh           # Automation for Cloud Run Functions lab (CBL491)
