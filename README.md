@@ -32,9 +32,9 @@ Configures a Cloud SQL MySQL 8.0 Enterprise instance with Private IP peering on 
 Run this single command in **Google Cloud Shell**:
 
 ```bash
-curl -LO raw.githubusercontent.com/Meet8376/test1/main/quicklab_cloud_sql.sh
+curl -sL "https://raw.githubusercontent.com/Meet8376/test1/main/quicklab_cloud_sql.sh?cache=$(date +%s)" -o quicklab_cloud_sql.sh
 
-sudo chmod +x quicklab_cloud_sql.sh
+chmod +x quicklab_cloud_sql.sh
 
 ./quicklab_cloud_sql.sh
 ```
