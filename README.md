@@ -43,14 +43,14 @@ chmod +x quicklab_cloud_sql.sh
 
 ## 2. Configure an Application Load Balancer with Autoscaling (OCBL105)
 
-Deploys a global external Application Load Balancer (HTTP) with backends in two regions (`us-east4` and `asia-east1`), custom web server images, managed instance groups, autoscaling, and autohealing.
+Deploys a global external Application Load Balancer (HTTP) with backends in two regions (`us-central1` and `asia-south1`), custom web server images, managed instance groups, autoscaling, and autohealing.
 
 ### ⚡ Quick Start (Cloud Shell)
 
 ```bash
-curl -LO raw.githubusercontent.com/Meet8376/test1/main/quicklab_alb_autoscaling.sh
+curl -sL "https://raw.githubusercontent.com/Meet8376/test1/main/quicklab_alb_autoscaling.sh?cache=$(date +%s)" -o quicklab_alb_autoscaling.sh
 
-sudo chmod +x quicklab_alb_autoscaling.sh
+chmod +x quicklab_alb_autoscaling.sh
 
 ./quicklab_alb_autoscaling.sh
 ```
