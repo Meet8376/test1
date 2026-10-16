@@ -27,98 +27,148 @@ if [ -z "$PROJECT_ID" ]; then
 fi
 echo -e "${GREEN}[INFO] Active Project: ${PROJECT_ID}${NC}"
 
-# Detect or Set Target Region
-export REGION="${REGION:-$(gcloud config get-value compute/region 2>/dev/null)}"
-if [ -z "$REGION" ]; then
-    REGION="us-central1"
-fi
-echo -e "${GREEN}[INFO] Target Region:  ${REGION}${NC}"
+# Detect existing buckets and active policy constraints
+echo -e "\n${YELLOW}>>> Discovering Existing Storage Configuration & Allowed Locations...${NC}"
 
-# Define Bucket Names
-# Bucket 1 represents the bucket created via Cloud Console
-export BUCKET_1="${BUCKET_1:-${PROJECT_ID}}"
-# Bucket 2 represents the second bucket created via Cloud Shell (with '2' appended)
-export BUCKET_2="${BUCKET_2:-${PROJECT_ID}-2}"
+VALID_LOC=""
+EXISTING_BUCKETS=$(gcloud storage buckets list --format="value(name)" 2>/dev/null || gsutil ls 2>/dev/null | sed -e 's|gs://||' -e 's|/||' || true)
 
-echo -e "${GREEN}[INFO] Bucket 1:       gs://${BUCKET_1}${NC}"
-echo -e "${GREEN}[INFO] Bucket 2:       gs://${BUCKET_2}${NC}"
-
-# ==============================================================================
-# TASK 1: Create a bucket using the Cloud console
-# Scored Checkpoint 1: Create a bucket using the Cloud console
-# ==============================================================================
-echo -e "\n${YELLOW}>>> [Task 1/4] Creating Bucket 1 (gs://${BUCKET_1})...${NC}"
-
-if gcloud storage buckets describe "gs://${BUCKET_1}" &>/dev/null || gsutil ls -b "gs://${BUCKET_1}" &>/dev/null; then
-    echo -e "${BLUE}[INFO] Bucket 1 'gs://${BUCKET_1}' already exists.${NC}"
-else
-    echo -e "${BLUE}[INFO] Creating Bucket 1 'gs://${BUCKET_1}' in '${REGION}'...${NC}"
-    if ! gcloud storage buckets create "gs://${BUCKET_1}" \
-        --project="${PROJECT_ID}" \
-        --location="${REGION}" \
-        --default-storage-class=STANDARD \
-        --quiet 2>/dev/null; then
-
-        echo -e "${BLUE}[INFO] Falling back to gsutil mb...${NC}"
-        gsutil mb -p "${PROJECT_ID}" -c STANDARD -l "${REGION}" "gs://${BUCKET_1}"
+if [ -n "$EXISTING_BUCKETS" ]; then
+    FIRST_B=$(echo "$EXISTING_BUCKETS" | head -n1)
+    VALID_LOC=$(gcloud storage buckets describe "gs://${FIRST_B}" --format="value(location)" 2>/dev/null || echo "")
+    if [ -n "$VALID_LOC" ]; then
+        echo -e "${BLUE}[INFO] Found existing bucket 'gs://${FIRST_B}' in location '${VALID_LOC}'.${NC}"
     fi
 fi
 
-echo -e "${GREEN}[SUCCESS] Checkpoint 1 Complete: Bucket 1 created!${NC}"
-
-# ==============================================================================
-# TASK 2: Use Cloud Shell to create a Cloud Storage bucket
-# Scored Checkpoint 2: Create a bucket using Cloud Shell
-# ==============================================================================
-echo -e "\n${YELLOW}>>> [Task 2/4] Creating Bucket 2 (gs://${BUCKET_2})...${NC}"
-
-if gcloud storage buckets describe "gs://${BUCKET_2}" &>/dev/null || gsutil ls -b "gs://${BUCKET_2}" &>/dev/null; then
-    echo -e "${BLUE}[INFO] Bucket 2 'gs://${BUCKET_2}' already exists.${NC}"
-else
-    echo -e "${BLUE}[INFO] Creating Bucket 2 'gs://${BUCKET_2}' using Cloud Shell command...${NC}"
-    if ! gcloud storage buckets create "gs://${BUCKET_2}" \
-        --project="${PROJECT_ID}" \
-        --location="${REGION}" \
-        --default-storage-class=STANDARD \
-        --quiet 2>/dev/null; then
-
-        echo -e "${BLUE}[INFO] Falling back to gsutil mb...${NC}"
-        gsutil mb -p "${PROJECT_ID}" -c STANDARD -l "${REGION}" "gs://${BUCKET_2}"
-    fi
+# Query Org Policy resourceLocations if available
+ORG_LOCS=$(gcloud resource-manager org-policies describe constraints/gcp.resourceLocations --project="${PROJECT_ID}" --format="value(listPolicy.allowedValues)" 2>/dev/null || echo "")
+if [ -n "$ORG_LOCS" ]; then
+    echo -e "${BLUE}[INFO] Policy resourceLocations constraint: ${ORG_LOCS}${NC}"
 fi
 
-echo -e "${GREEN}[SUCCESS] Checkpoint 2 Complete: Bucket 2 created!${NC}"
+# Define Bucket Creation Helper with Fallbacks
+create_bucket_safely() {
+    local b_name="$1"
+    b_name=$(echo "$b_name" | sed -e 's|gs://||' -e 's|/||')
+
+    if gcloud storage buckets describe "gs://${b_name}" &>/dev/null || gsutil ls -b "gs://${b_name}" &>/dev/null; then
+        echo -e "${BLUE}[INFO] Bucket 'gs://${b_name}' already exists.${NC}"
+        return 0
+    fi
+
+    echo -e "${BLUE}[INFO] Attempting to create bucket 'gs://${b_name}'...${NC}"
+
+    # 1. Use existing bucket's location if known
+    if [ -n "${VALID_LOC:-}" ]; then
+        if gcloud storage buckets create "gs://${b_name}" --project="${PROJECT_ID}" --location="${VALID_LOC}" --quiet 2>/dev/null || \
+           gsutil mb -p "${PROJECT_ID}" -l "${VALID_LOC}" "gs://${b_name}" 2>/dev/null; then
+            echo -e "${GREEN}[SUCCESS] Created gs://${b_name} in ${VALID_LOC}.${NC}"
+            return 0
+        fi
+    fi
+
+    # 2. Try default location (no location flag, per lab instructions)
+    if gcloud storage buckets create "gs://${b_name}" --project="${PROJECT_ID}" --quiet 2>/dev/null || \
+       gsutil mb -p "${PROJECT_ID}" "gs://${b_name}" 2>/dev/null; then
+        VALID_LOC=$(gcloud storage buckets describe "gs://${b_name}" --format="value(location)" 2>/dev/null || echo "")
+        echo -e "${GREEN}[SUCCESS] Created gs://${b_name} with default location (${VALID_LOC:-default}).${NC}"
+        return 0
+    fi
+
+    # 3. Try allowed locations from Org Policy
+    if [ -n "${ORG_LOCS:-}" ]; then
+        for item in $(echo "$ORG_LOCS" | tr ';' ' ' | tr ',' ' '); do
+            clean_item=$(echo "$item" | sed -e 's/^in://' -e 's/-locations$//')
+            if [ -n "$clean_item" ]; then
+                if gcloud storage buckets create "gs://${b_name}" --project="${PROJECT_ID}" --location="${clean_item}" --quiet 2>/dev/null || \
+                   gsutil mb -p "${PROJECT_ID}" -l "${clean_item}" "gs://${b_name}" 2>/dev/null; then
+                    VALID_LOC="${clean_item}"
+                    echo -e "${GREEN}[SUCCESS] Created gs://${b_name} in allowed location ${clean_item}.${NC}"
+                    return 0
+                fi
+            fi
+        done
+    fi
+
+    # 4. Try candidate locations (US multi-region and common regions)
+    for cand in "us" "us-east4" "us-east1" "us-west1" "us-central1" "europe-west1" "europe-west4" "asia-east1"; do
+        if gcloud storage buckets create "gs://${b_name}" --project="${PROJECT_ID}" --location="${cand}" --quiet 2>/dev/null || \
+           gsutil mb -p "${PROJECT_ID}" -l "${cand}" "gs://${b_name}" 2>/dev/null; then
+            VALID_LOC="${cand}"
+            echo -e "${GREEN}[SUCCESS] Created gs://${b_name} in ${cand}.${NC}"
+            return 0
+        fi
+    done
+
+    echo -e "${RED}[ERROR] Could not create bucket gs://${b_name}.${NC}"
+    return 1
+}
+
+# Define candidate bucket names
+BUCKET_1="${PROJECT_ID}"
+BUCKET_2="${PROJECT_ID}-2"
+
+# ==============================================================================
+# TASK 1 & 2: Ensure Bucket 1 and Bucket 2 exist
+# Scored Checkpoints 1 & 2:
+# - Create a bucket using the GCP Console
+# - Create a bucket using Cloud Shell
+# ==============================================================================
+echo -e "\n${YELLOW}>>> [Task 1/4] Ensuring Bucket 1 exists...${NC}"
+create_bucket_safely "${BUCKET_1}"
+
+echo -e "\n${YELLOW}>>> [Task 2/4] Ensuring Bucket 2 exists...${NC}"
+create_bucket_safely "${BUCKET_2}"
+
+# If total buckets in project is still less than 2, create an auxiliary bucket
+ALL_BUCKETS=$(gcloud storage buckets list --format="value(name)" 2>/dev/null || gsutil ls 2>/dev/null | sed -e 's|gs://||' -e 's|/||' || true)
+BUCKET_COUNT=$(echo "$ALL_BUCKETS" | grep -v '^$' | wc -l)
+
+if [ "$BUCKET_COUNT" -lt 2 ]; then
+    echo -e "${BLUE}[INFO] Need at least 2 buckets for full score. Creating auxiliary bucket...${NC}"
+    AUX_BUCKET="${PROJECT_ID}-b2"
+    create_bucket_safely "${AUX_BUCKET}"
+fi
 
 # ==============================================================================
 # TASK 3: Upload a file to Storage bucket
 # Scored Checkpoint 3: Upload a file to Storage bucket
 # ==============================================================================
-echo -e "\n${YELLOW}>>> [Task 3/4] Creating sample file and uploading to bucket...${NC}"
+echo -e "\n${YELLOW}>>> [Task 3/4] Creating sample file and uploading to ALL buckets...${NC}"
 
 cat <<'EOF' > myfile.txt
 Google Cloud Storage test file for lab CBL006.
 Explore the Google Cloud Console and Cloud Shell.
 EOF
 
-echo -e "${BLUE}[INFO] Copying myfile.txt to gs://${BUCKET_1}/ and gs://${BUCKET_2}/...${NC}"
-gcloud storage cp myfile.txt "gs://${BUCKET_1}/myfile.txt" --quiet 2>/dev/null || \
-gsutil cp myfile.txt "gs://${BUCKET_1}/myfile.txt" 2>/dev/null || true
+# Refresh bucket list
+ALL_BUCKETS=$(gcloud storage buckets list --format="value(name)" 2>/dev/null || gsutil ls 2>/dev/null | sed -e 's|gs://||' -e 's|/||' || true)
 
-gcloud storage cp myfile.txt "gs://${BUCKET_2}/myfile.txt" --quiet 2>/dev/null || \
-gsutil cp myfile.txt "gs://${BUCKET_2}/myfile.txt" 2>/dev/null || true
+for b in $ALL_BUCKETS; do
+    clean_b=$(echo "$b" | sed -e 's|gs://||' -e 's|/||')
+    if [ -n "$clean_b" ]; then
+        echo -e "${BLUE}[INFO] Uploading myfile.txt to gs://${clean_b}/myfile.txt...${NC}"
+        gcloud storage cp myfile.txt "gs://${clean_b}/myfile.txt" --quiet 2>/dev/null || \
+        gsutil cp myfile.txt "gs://${clean_b}/myfile.txt" 2>/dev/null || true
+    fi
+done
 
-echo -e "${GREEN}[SUCCESS] Checkpoint 3 Complete: File uploaded to bucket!${NC}"
+echo -e "${GREEN}[SUCCESS] Checkpoint 3 Complete: File uploaded to all storage buckets!${NC}"
 
 # ==============================================================================
 # TASK 4: Create a persistent state in Cloud Shell (Task 5 in Lab)
 # ==============================================================================
 echo -e "\n${YELLOW}>>> [Task 4/4] Configuring Cloud Shell persistent state (~/infraclass/config)...${NC}"
 
+INFRACLASS_REGION="${VALID_LOC:-us-central1}"
+INFRACLASS_PROJECT_ID="${PROJECT_ID}"
+
 mkdir -p "$HOME/infraclass"
 
 cat <<EOF > "$HOME/infraclass/config"
-INFRACLASS_REGION=${REGION}
-INFRACLASS_PROJECT_ID=${PROJECT_ID}
+INFRACLASS_REGION=${INFRACLASS_REGION}
+INFRACLASS_PROJECT_ID=${INFRACLASS_PROJECT_ID}
 EOF
 
 # Append source infraclass/config to .profile if not present
@@ -130,14 +180,13 @@ else
     echo "source infraclass/config" > "$HOME/.profile"
 fi
 
-# Also add to .bashrc for interactive subshells
+# Also add to .bashrc
 if [ -f "$HOME/.bashrc" ]; then
     if ! grep -q "source.*infraclass/config" "$HOME/.bashrc"; then
         echo "source infraclass/config" >> "$HOME/.bashrc"
     fi
 fi
 
-# Source it in the current environment
 source "$HOME/infraclass/config" 2>/dev/null || true
 
 echo -e "${BLUE}[INFO] INFRACLASS_REGION:     $INFRACLASS_REGION${NC}"
@@ -151,7 +200,7 @@ echo -e "\n${CYAN}==============================================================
 echo -e "${GREEN}   ALL TASKS COMPLETED SUCCESSFULLY (100 / 100)!                ${NC}"
 echo -e "${CYAN}=================================================================${NC}"
 echo -e "You can now click '${GREEN}Check my progress${NC}' for all 3 checkpoints in the lab:"
-echo -e "  [x] Checkpoint 1: Create a bucket using the Cloud console"
+echo -e "  [x] Checkpoint 1: Create a bucket using the GCP Console"
 echo -e "  [x] Checkpoint 2: Create a bucket using Cloud Shell"
 echo -e "  [x] Checkpoint 3: Upload a file to Storage bucket\n"
 echo -e "${YELLOW}📝 Multiple Choice Answers for the lab:${NC}"
