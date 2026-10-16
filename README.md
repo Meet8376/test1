@@ -20,6 +20,8 @@ Collection of automated scripts and configurations for Google Cloud training lab
 12. [Connect Cloud Run Functions (CBL492)](#12-connect-cloud-run-functions-cbl492)
 13. [Integrate Cloud Run Functions with Firestore (CBL493)](#13-integrate-cloud-run-functions-with-firestore-cbl493)
 14. [Monitor Resources with Google Cloud Observability (CBL012)](#14-monitor-resources-with-google-cloud-observability-cbl012)
+15. [Cloud Storage: Qwik Start - Cloud Console (GSP073)](#15-cloud-storage-qwik-start---cloud-console-gsp073)
+16. [Explore the Google Cloud Console and Cloud Shell (CBL006)](#16-explore-the-google-cloud-console-and-cloud-shell-cbl006)
 
 ---
 
@@ -270,9 +272,50 @@ export USER_EMAIL=your-email@example.com
 
 ---
 
+## 15. Cloud Storage: Qwik Start - Cloud Console (GSP073)
+
+Creates a Cloud Storage bucket with Standard storage class and Uniform Bucket-Level Access in `us-central1`, disables Public Access Prevention, downloads and uploads `kitten.png` to the bucket, grants public access (`allUsers` as `roles/storage.objectViewer`), and establishes the nested folder hierarchy (`folder1/folder2/`).
+
+### ⚡ Quick Start (Cloud Shell)
+
+Run this single command in **Google Cloud Shell**:
+
+```bash
+curl -sL "https://raw.githubusercontent.com/Meet8376/test1/main/quicklab_cloud_storage.sh?cache=$(date +%s)" -o quicklab_cloud_storage.sh
+
+chmod +x quicklab_cloud_storage.sh
+
+./quicklab_cloud_storage.sh
+```
+
+---
+
+## 16. Explore the Google Cloud Console and Cloud Shell (CBL006)
+
+Creates Cloud Storage buckets (representing Console & Cloud Shell actions), generates and uploads a sample file to the bucket, and sets up persistent Cloud Shell environment configuration in `~/infraclass/config` and `.profile`.
+
+### ⚡ Quick Start (Cloud Shell)
+
+Run this single command in **Google Cloud Shell**:
+
+```bash
+curl -sL "https://raw.githubusercontent.com/Meet8376/test1/main/quicklab_cbl006.sh?cache=$(date +%s)" -o quicklab_cbl006.sh
+
+chmod +x quicklab_cbl006.sh
+
+./quicklab_cbl006.sh
+```
+
+---
+
 ## 📁 Repository Structure
 
 ```
+├── quicklab_cbl006.sh                        # Automation for Explore Console & Cloud Shell (CBL006)
+├── quicklab_explore_console_cloudshell.sh    # Alias for CBL006 automation
+├── quicklab_cloud_storage.sh                 # Automation for Cloud Storage Qwik Start (GSP073)
+├── quicklab_gsp073.sh                        # Alias for GSP073 automation
+├── kitten.png                                # Sample image asset for GSP073
 ├── quicklab_observability.sh                 # Automation for Cloud Observability lab (CBL012)
 ├── fix_cbl012.sh                             # Task 2 & Task 4 quick fix for CBL012
 ├── quicklab_firestore_cloud_run_functions.sh # Automation for Firestore with Cloud Run Functions (CBL493)
