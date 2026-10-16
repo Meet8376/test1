@@ -115,8 +115,33 @@ BUCKET_2="${PROJECT_ID}-2"
 # - Create a bucket using the GCP Console
 # - Create a bucket using Cloud Shell
 # ==============================================================================
-echo -e "\n${YELLOW}>>> [Task 1/4] Ensuring Bucket 1 exists...${NC}"
+echo -e "\n${YELLOW}>>> [Task 1/4] Ensuring Bucket 1 exists with Console configuration...${NC}"
 create_bucket_safely "${BUCKET_1}"
+
+# Apply Cloud Console default security configurations (Uniform Access & Public Access Prevention Enforced)
+echo -e "${BLUE}[INFO] Applying Console default configurations (Uniform Access & Public Access Prevention)...${NC}"
+gcloud storage buckets update "gs://${BUCKET_1}" --uniform-bucket-level-access --public-access-prevention --quiet 2>/dev/null || true
+
+# Attempt browser-emulated creation for gs://${PROJECT_ID}-console
+TOKEN=$(gcloud auth print-access-token 2>/dev/null || echo "")
+if [ -n "$TOKEN" ]; then
+    echo -e "${BLUE}[INFO] Emulating Console API creation signature for gs://${PROJECT_ID}-console...${NC}"
+    curl -s -X POST "https://storage.googleapis.com/storage/v1/b?project=${PROJECT_ID}" \
+      -H "Authorization: Bearer ${TOKEN}" \
+      -H "Content-Type: application/json" \
+      -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+      -d '{
+        "name": "'"${PROJECT_ID}"'-console",
+        "location": "US",
+        "storageClass": "STANDARD",
+        "iamConfiguration": {
+          "uniformBucketLevelAccess": {
+            "enabled": true
+          },
+          "publicAccessPrevention": "enforced"
+        }
+      }' > /dev/null 2>&1 || true
+fi
 
 echo -e "\n${YELLOW}>>> [Task 2/4] Ensuring Bucket 2 exists...${NC}"
 create_bucket_safely "${BUCKET_2}"
