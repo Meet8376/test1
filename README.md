@@ -22,6 +22,7 @@ Collection of automated scripts and configurations for Google Cloud training lab
 14. [Monitor Resources with Google Cloud Observability (CBL012)](#14-monitor-resources-with-google-cloud-observability-cbl012)
 15. [Cloud Storage: Qwik Start - Cloud Console (GSP073)](#15-cloud-storage-qwik-start---cloud-console-gsp073)
 16. [Explore the Google Cloud Console and Cloud Shell (CBL006)](#16-explore-the-google-cloud-console-and-cloud-shell-cbl006)
+17. [Deploy a LAMP Stack with Google Cloud Marketplace (CBL011)](#17-deploy-a-lamp-stack-with-google-cloud-marketplace-cbl011)
 
 ---
 
@@ -308,9 +309,29 @@ chmod +x quicklab_cbl006.sh
 
 ---
 
+## 17. Deploy a LAMP Stack with Google Cloud Marketplace (CBL011)
+
+Deploys a complete LAMP Stack (Linux, Apache, MySQL/MariaDB, PHP) on Compute Engine (`lamp-1-vm` in zone `us-central1-a` with machine type `e2-medium`), enables Deployment Manager and Compute APIs, sets up HTTP firewall rules, and starts the Apache web server.
+
+### ⚡ Quick Start (Cloud Shell)
+
+Run this single command in **Google Cloud Shell**:
+
+```bash
+curl -sL "https://raw.githubusercontent.com/Meet8376/test1/main/quicklab_cbl011.sh?cache=$(date +%s)" -o quicklab_cbl011.sh
+
+chmod +x quicklab_cbl011.sh
+
+./quicklab_cbl011.sh
+```
+
+---
+
 ## 📁 Repository Structure
 
 ```
+├── quicklab_cbl011.sh                        # Automation for Deploy a LAMP Stack with Cloud Marketplace (CBL011)
+├── quicklab_lamp_marketplace.sh              # Alias for CBL011 automation
 ├── quicklab_cbl006.sh                        # Automation for Explore Console & Cloud Shell (CBL006)
 ├── quicklab_explore_console_cloudshell.sh    # Alias for CBL006 automation
 ├── quicklab_cloud_storage.sh                 # Automation for Cloud Storage Qwik Start (GSP073)
